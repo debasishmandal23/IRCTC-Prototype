@@ -72,6 +72,7 @@
       else if (w === 2) { start = add(h.date, -3); end = h.date; leave = add(h.date, -1); }
       else if (w === 4) { start = h.date; end = add(h.date, 3); leave = add(h.date, 1); }
       else return;
+      if (add(start, -1) < t0) return; // the travel date (evening before) has already passed
       var days = Math.round((parse(end) - parse(start)) / 86400000) + 1;
       out.push({ holiday: h, weekday: WD[w], start: start, end: end, days: days, leave: leave, travelDate: add(start, -1), returnDate: end,
         daysAway: Math.round((parse(start) - today) / 86400000) });

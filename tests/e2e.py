@@ -827,6 +827,8 @@ def v11_verify(browser, base, vp):
         w = pg.ev('d => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][OT.data.rail.parseYmd(d).getDay()]', l['date'])
         check('long weekend %s %s is a %s (computed %s)' % (l['name'], l['date'], w, l['wd']), w == l['wd'])
         check('long weekend %s: travel date %s not in the past' % (l['name'], l['travel']), l['travel'] >= today, l)
+    mid = pg.ev('() => OT.data.demand.longWeekends("2026-11-21", 3).map(l => l.holiday.name)')
+    check('a long weekend already under way (travel date passed) is not offered', 'Guru Nanak Jayanti' not in mid, mid)
     expect = {'Christmas': ('2026-12-25', 'Fri'), 'Guru Nanak Jayanti': ('2026-11-24', 'Tue'), 'Republic Day': ('2027-01-26', 'Tue')}
     if today <= '2026-11-20':
         names = {l['name']: (l['date'], l['wd']) for l in lws}
@@ -912,6 +914,9 @@ def v11_verify(browser, base, vp):
         p.click('#hdr-user'); p.click('#user-menu [data-persona="partner"]'); p.wait_for_timeout(500)
         pg.go('partner/bookings', 400)
         txt = p.inner_text('#view')
+        nn = pg.ev('() => { const j = OT.store.get("journey"); return j.nights; }')
+        row = p.locator('tr.row-new').first.inner_text()
+        check('partner: live hotel row shows the booked nights (%s)' % nn, ('%d night' % nn) in row, row[:160])
         check('partner: hotel booking appears as New via OneTrip; no train row', p.locator('tr.row-new').count() == len(hotel_b) and 'OT-TRN-' not in txt, p.locator('tr.row-new').count())
     # admin totals: train fares separate from add-on GTV
     p.click('#hdr-user'); p.click('#user-menu [data-persona="admin"]'); p.wait_for_timeout(500)

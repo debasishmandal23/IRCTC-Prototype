@@ -98,7 +98,7 @@
       return {
         ref: b.ref || 'OT-LIVE', guest: b.guest || 'OneTrip traveller', title: b.title || 'OneTrip booking', type: b.type,
         checkin: (it && it.when) || b.when || (j.train && j.train.date) || b.paidAt,
-        nights: b.nights || (it && it.endWhen ? 1 : null), amount: Number(b.amount) || 0,
+        nights: b.nights || (it && it.when && it.endWhen ? Math.max(1, Math.round((new Date(String(it.endWhen).slice(0, 10) + 'T00:00:00') - new Date(String(it.when).slice(0, 10) + 'T00:00:00')) / 86400000)) : null), amount: Number(b.amount) || 0,
         status: b.status === 'refunded' ? 'cancelled' : (b.status || 'confirmed'), lang: langName(b.lang), paidAt: b.paidAt, live: true, early: !!b.earlyCheckIn, pax: b.pax,
         refund: b.cancellation
       };
