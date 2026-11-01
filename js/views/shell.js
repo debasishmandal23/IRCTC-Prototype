@@ -72,6 +72,16 @@
     else OT.go('home?voice=1');
   };
 
+  /** Collapse the nav into the menu whenever it does not fit (long labels in some scripts). */
+  shell.fitHeader = function () {
+    var hdr = OT.$('.app-header'), c = hdr && hdr.querySelector('.container');
+    if (!hdr || !c) return;
+    hdr.classList.remove('tight', 'compact');
+    if (window.innerWidth <= 1100) return;           // base.css already uses the menu here
+    if (c.scrollWidth > c.clientWidth + 1) hdr.classList.add('tight');
+    if (c.scrollWidth > c.clientWidth + 1) hdr.classList.add('compact');
+  };
+
   shell.rerender = function () {
     var y = window.scrollY;
     OT.router.render();
@@ -107,12 +117,15 @@
     var demo = $('hdr-demo'); if (demo) demo.addEventListener('click', function () { if (OT.tour) OT.tour.start(); });
     var set = $('hdr-settings'); if (set) set.addEventListener('click', function () { OT.go('settings'); });
 
+    shell.fitHeader();
+    window.addEventListener('resize', OT.debounce(shell.fitHeader, 120));
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(shell.fitHeader).catch(function () {});
     OT.on('route', highlight);
     OT.on('store:user', updateUser);
     OT.on('lang', function (code) {
       var sel = $('lang-select'); if (sel && sel.value !== code) sel.value = code;
       OT.i18n.apply(document);
-      labels(); updateUser();
+      labels(); updateUser(); shell.fitHeader();
       if (OT.lang) OT.lang.stop();
       shell.rerender();
     });

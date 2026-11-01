@@ -54,10 +54,10 @@
     var u = OT.store.get('user');
     var d = ROLES[role].demo;
     el.innerHTML = '<div class="container page auth-page"><div class="auth-grid">' +
-      '<div class="auth-copy"><p class="eyebrow">' + OT.icon('shield', 14) + ' ' + OT.esc(t('auth.sso', 'One IRCTC login for your whole journey (SSO concept)')) + '</p>' +
+      '<div class="auth-copy"><p class="ot-eyebrow">' + OT.icon('shield', 14) + ' ' + OT.esc(t('auth.sso', 'One IRCTC login for your whole journey (SSO concept)')) + '</p>' +
       '<h1>' + OT.esc(t('auth.title', 'Sign in')) + '</h1>' +
       '<p class="muted">' + OT.esc(t('auth.sub', 'Simulated sign-in for the demo. No real account, password or OTP is used or stored.')) + '</p>' +
-      '<div class="demo-creds card-flat small"><strong>' + OT.esc(t('auth.demo', 'Demo accounts')) + '</strong><ul>' +
+      '<div class="auth-creds card-flat small"><strong>' + OT.esc(t('auth.demo', 'Demo accounts')) + '</strong><ul>' +
       Object.keys(ROLES).map(function (k) { return '<li><span>' + OT.esc(t(ROLES[k].key, ROLES[k].en)) + '</span><code>' + OT.esc(ROLES[k].demo.email) + '</code></li>'; }).join('') +
       '</ul><span class="xs muted">' + OT.esc(t('auth.demoPw', 'Password for all: demo-1234 (not checked, not stored)')) + '</span></div></div>' +
       '<div>' + (u ? signedInHTML(u) : '') +
@@ -73,7 +73,7 @@
   function renderRegister(el) {
     var d = ROLES[role].demo, langs = OT.i18n.languages;
     el.innerHTML = '<div class="container page auth-page"><div class="auth-grid">' +
-      '<div class="auth-copy"><p class="eyebrow">' + OT.icon('shield', 14) + ' ' + OT.esc(t('auth.consentFirst', 'Consent first: every sharing option is off until you turn it on')) + '</p>' +
+      '<div class="auth-copy"><p class="ot-eyebrow">' + OT.icon('shield', 14) + ' ' + OT.esc(t('auth.consentFirst', 'Consent first: every sharing option is off until you turn it on')) + '</p>' +
       '<h1>' + OT.esc(t('auth.regTitle', 'Create your OneTrip account')) + '</h1>' +
       '<p class="muted">' + OT.esc(t('auth.sub', 'Simulated sign-in for the demo. No real account, password or OTP is used or stored.')) + '</p></div>' +
       '<form class="card auth-form" id="reg-form">' + rolePicker() +

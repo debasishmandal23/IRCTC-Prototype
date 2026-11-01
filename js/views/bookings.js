@@ -17,7 +17,7 @@
     return '<div class="rf-track" data-tour="refund"><div class="rf-head small"><strong>' + OT.esc(t('rf.title', 'Refund tracker')) + '</strong> · ' + keep(OT.inr(c.refundAmount)) +
       ' (' + c.pct + '%) · ' + OT.esc(t('rf.eta', 'ETA {d}', { d: OT.fmtDate(c.eta) })) + '</div>' +
       '<ol class="rf-steps">' + STAGES.map(function (s, i) {
-        var st = i < stage ? 'done' : i === stage ? (stage === 3 ? 'done' : 'now') : 'todo';
+        var st = i <= stage ? 'done' : i === stage + 1 ? 'now' : 'todo';
         var when = c.times && c.times[i] ? '<span class="xs muted">' + OT.esc(OT.stamp(new Date(c.times[i]))) + '</span>' : '';
         return '<li class="rf-' + st + '"><span class="rf-dot">' + (st === 'done' ? OT.icon('check', 12) : '') + '</span><span class="rf-lbl">' + OT.esc(t(s[0], s[1])) + when + '</span></li>';
       }).join('') + '</ol>' +
@@ -28,7 +28,7 @@
   function cardHTML(b) {
     var x = D().get(b.refId) || {}, rf = OT.agents.refundFor(b);
     var st = b.status;
-    return '<article class="bk card-flat" data-bk="' + b.ref + '">' +
+    return '<article class="bkg card-flat" data-bk="' + b.ref + '">' +
       '<div class="bk-top"><span class="offer-ic">' + OT.icon(x.service ? 'lock' : b.type, 20) + '</span>' +
       '<div class="bk-title"><strong>' + OT.esc(b.title) + '</strong><span class="xs muted">' + OT.esc(b.provider || '') + ' · ' + keep(b.ref) + '</span></div>' +
       '<div class="bk-amt">' + keep(OT.inr(b.amount)) + OT.badge(st) + '</div></div>' +

@@ -27,7 +27,7 @@
     var s = D().stations[code];
     var z = ZONES[s.zone] || ZONES.NR;
     var first = boardScripts(code)[0];
-    return '<div class="board" role="img" aria-label="' + OT.esc(OT.t('home.boardAria', 'Destination station board: {name}', { name: s.names.en })) + '">' +
+    return '<div class="stn-board" role="img" aria-label="' + OT.esc(OT.t('home.boardAria', 'Destination station board: {name}', { name: s.names.en })) + '">' +
       '<div class="board-plate">' +
       '<div class="board-top"><span class="board-code">' + OT.esc(code) + '</span><span class="board-zone">' + OT.esc(z.hi) + ' · ' + OT.esc(z.en) + '</span></div>' +
       '<div class="board-name-wrap"><div class="board-name" data-board-name lang="' + first + '">' + OT.esc(s.names[first] || s.names.en) + '</div></div>' +
@@ -85,6 +85,7 @@
       '<p class="kicker">' + OT.icon('train', 16) + ' <span>' + OT.esc(t('hero.kicker', 'Rail-first trip planner · 11 Indian languages')) + '</span></p>' +
       '<h1>' + OT.esc(t('hero.title', 'Your train is booked. Plan everything after it, in your language.')) + '</h1>' +
       '<p class="lead">' + OT.esc(t('hero.sub', 'Hotel, station cab, food and sightseeing, verified by AI agents and arranged around your train in one journey dashboard.')) + '</p>' +
+      '<button type="button" class="btn btn-ghost btn-sm hero-demo" data-start-tour>' + OT.icon('play', 14) + OT.esc(t('home.demo', 'Start the 3-minute guided demo')) + '</button>' +
       '<div class="board-slot" data-board-slot>' + boardHTML(to) + '</div>' +
       '</div>' +
       '<form class="search-card card" id="trip-form" novalidate>' +
@@ -104,7 +105,7 @@
       '</div>' +
       '</div>' +
       '<div class="or-rule"><span>' + OT.esc(t('search.orForm', 'or fill in your trip')) + '</span></div>' +
-      '<div class="form-grid">' +
+      '<div class="trip-grid">' +
       '<div class="field"><label for="f-from">' + OT.esc(t('search.from', 'From')) + '</label><select id="f-from" class="input">' + opt('from', sc.from, ['NDLS', 'MS', 'HWH']) + '</select></div>' +
       '<div class="field"><label for="f-to">' + OT.esc(t('search.to', 'To')) + '</label><select id="f-to" class="input">' + opt('to', to, ['CDG', 'MDU', 'PURI']) + '</select></div>' +
       '<div class="field"><label for="f-date">' + OT.esc(t('search.date', 'Travel date')) + '</label><input id="f-date" class="input" type="date" value="' + OT.esc(date) + '"></div>' +
@@ -356,6 +357,7 @@
     });
     f.querySelector('#f-from').addEventListener('change', function () { showError(''); });
     el.querySelector('#pnr-btn').addEventListener('click', pnrModal);
+    var sd = el.querySelector('[data-start-tour]'); if (sd) sd.addEventListener('click', function () { if (OT.tour) OT.tour.start(); });
     OT.$$('[data-scen]', el).forEach(function (b) {
       b.addEventListener('click', function () {
         var code = b.getAttribute('data-scen'), sc = D().scenarios[code];

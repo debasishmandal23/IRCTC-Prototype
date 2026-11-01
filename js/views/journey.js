@@ -89,7 +89,7 @@
       }
       return '<div class="tl-conflict" data-conflict="' + c.id + '" data-tour="conflict">' + OT.icon('alert', 18) + '<div><strong>' + OT.lang.highlight(head) + '</strong>' +
         '<p class="small">' + OT.esc(t('tl.conflictWhy', 'Itinerary Agent: your train arrives before the hotel\'s standard check-in. Choose one:')) + '</p>' +
-        '<div class="fixes">' + fixesFor(c, j).map(function (f) { return '<button type="button" class="btn btn-ghost btn-sm" data-fix="' + f.k + '"' + (f.ref ? ' data-ref="' + f.ref + '"' : '') + '>' + OT.lang.highlight(f.label) + '</button>'; }).join('') + '</div></div></div>';
+        '<div class="fixes">' + fixesFor(c, j).map(function (f) { return '<button type="button" class="btn btn-ghost btn-sm" data-fix="' + f.k + '"' + (f.ref ? ' data-ref="' + f.ref + '"' : '') + '><span>' + OT.lang.highlight(f.label) + '</span></button>'; }).join('') + '</div></div></div>';
     }
     var msg = c.kind === 'cabEarly' ? t('tl.cabEarly', 'This pickup is before your train arrives. Change the time.') : t('tl.beforeArr', 'This is planned before your train arrives. Change the time.');
     return '<div class="tl-conflict" data-conflict="' + c.id + '">' + OT.icon('alert', 18) + '<div><strong>' + OT.esc(msg) + '</strong></div></div>';
@@ -254,7 +254,7 @@
     OT.state.lastReadiness = rd.score; OT.state.lastReadinessJ = j.id;
     var tr = j.train;
     el.innerHTML = '<div class="container page journey-page">' +
-      '<div class="page-head"><div><p class="eyebrow">' + OT.icon('route', 14) + ' ' + OT.esc(t('journey.eyebrow', 'One journey. One dashboard.')) + '</p>' +
+      '<div class="page-head"><div><p class="ot-eyebrow">' + OT.icon('route', 14) + ' ' + OT.esc(t('journey.eyebrow', 'One journey. One dashboard.')) + '</p>' +
       '<h1>' + OT.esc(t('journey.title', 'My Journey')) + ': ' + OT.esc(D().stationName(tr.from, L())) + ' → ' + OT.esc(D().stationName(tr.to, L())) + '</h1>' +
       '<p>' + OT.lang.highlight(t('journey.sub', '{date} · {n} travellers · hotel budget {b}/night', { date: OT.fmtDate(tr.date), n: j.passengers, b: OT.inr(j.budget) })) + '</p></div>' +
       '<div class="row-wrap"><button type="button" class="btn btn-ghost btn-sm" id="j-play">' + OT.icon('speaker', 16) + OT.esc(t('tl.play', 'Play itinerary aloud')) + '</button>' +

@@ -92,22 +92,23 @@
       target: '.asst-drawer', enter: function () {
         if (!OT.assistant) return null;
         OT.assistant.open();
-        return OT.assistant.ask('मेरा रिफंड कब आएगा?', { speak: true });
+        return OT.assistant.ask('मेरा रिफंड कब आएगा?', { speak: true })
+          .then(function () { return waitFor(function () { return document.querySelector('.say-card.show'); }, 1800); });
       } },
     { title: 'Partner dashboard sees the booking', text: 'Logged in as Hotel Shivalik View (P-101), the partner sees the new booking and KPIs update.',
-      target: ['[data-tour="partner-bookings"]', '#partner-bookings', '.page-head'], enter: function () {
+      target: ['[data-tour="partner-bookings"]', function () { var l = document.querySelector('#view .pill-live'); return l && (l.closest('tr') || l); }, '#view h1', '.page-head'], enter: function () {
         if (OT.assistant) OT.assistant.close();
         if (OT.lang) OT.lang.stop();
         OT.store.set('user', { name: 'Rajinder Singh', email: 'p101.shivalik@demo.onetrip', role: 'partner', partnerId: 'P-101', org: 'Hotel Shivalik View', simulated: true });
-        return go('partner');
+        return go('partner/bookings', 'partner');
       } },
     { title: 'Admin & Bank: language analytics', text: 'Admin monitors users, bookings, refunds, partner performance, financial products and language usage, translation quality and support.',
-      target: ['[data-tour="admin-language"]', '#admin-language', '.page-head'], enter: function () {
+      target: ['[data-tour="admin-language"]', '#view h1', '.page-head'], enter: function () {
         OT.store.set('user', { name: 'Ananya Rao', email: 'admin@demo.onetrip', role: 'admin', org: 'IRCTC OneTrip Admin · Partner Bank (sample)', simulated: true });
-        return go('admin');
+        return go('admin/language', 'admin');
       } },
     { title: 'The business case', text: 'Survey evidence (N=52), personas, the five case questions, the bank’s role, financial products, revenue model and social-mandate guardrails. End of the tour.',
-      target: '.page-head', enter: function () { return go('insights'); } }
+      target: ['#view h1', '.page-head'], enter: function () { return go('insights'); } }
   ];
 
   function build() {
@@ -221,6 +222,7 @@
   };
   T.next = function () {
     if (!active || busy) return Promise.resolve();
+    if (OT.lang) OT.lang.stop();
     if (idx >= steps.length - 1) { T.end(); return Promise.resolve(); }
     return run(idx + 1, true);
   };
@@ -228,6 +230,7 @@
   T.end = function () {
     if (!active) return;
     active = false;
+    if (OT.lang) OT.lang.stop();
     document.body.classList.remove('touring');
     window.removeEventListener('resize', loop); window.removeEventListener('scroll', loop, true);
     document.removeEventListener('keydown', onKey);

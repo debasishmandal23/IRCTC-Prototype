@@ -411,6 +411,7 @@
     if (!pol) return T('pol.none', 'Cancellation policy not published by provider. Contact provider before booking.');
     if (pol.fullUntilH === 0 && pol.thenPct === 0) return T('pol.payAtUse', 'Pay-at-use or no-refund item: cancel any time before use, nothing is charged in advance online (sample).');
     if (pol.fullUntilH === 0) return T('pol.flex', 'Fully refundable until use.');
+    if (pol.thenPct === 0 && OT.i18n && OT.i18n.has('pol.strict', lang || OT.i18n.lang())) return T('pol.strict', 'Free cancellation until {h} h before start; no refund after that.', { h: pol.fullUntilH });
     return T('pol.std', 'Free cancellation until {h} h before start; after that {p}% refund.', { h: pol.fullUntilH, p: pol.thenPct });
   };
 

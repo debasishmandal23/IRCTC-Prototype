@@ -89,7 +89,7 @@
     labels.push(x.managed === 'irctc' ? '<span class="lbl lbl-irctc">' + OT.esc(t('res.irctc', 'IRCTC-managed')) + '</span>' : '<span class="lbl">' + OT.esc(t('res.partner', 'Partner offer')) + '</span>');
     if (x.sponsored) labels.push('<span class="lbl lbl-spon">' + OT.esc(t('res.sponsored', 'Sponsored')) + '</span>');
     var facts = [];
-    facts.push(x.rating != null ? '<li>' + OT.icon('star', 14) + ' <strong>' + x.rating + '</strong> <span class="muted">· ' + OT.esc(t('res.reviews', '{n} reviews', { n: x.reviews.toLocaleString('en-IN') })) + '</span></li>'
+    facts.push(x.rating != null ? '<li>' + OT.icon('star', 14) + ' <strong>' + Number(x.rating).toFixed(1) + '</strong> <span class="muted">· ' + OT.esc(t('res.reviews', '{n} reviews', { n: x.reviews.toLocaleString('en-IN') })) + '</span></li>'
       : (x.providerSource.ratingNotApplicable ? '' : '<li class="muted">' + OT.icon('star', 14) + ' ' + OT.esc(t('res.noRating', 'Rating unavailable at source')) + '</li>'));
     if (v.verdict === 'confirm' && v.flags.some(function (f) { return f.kind === 'rating'; }) && x.rating != null) facts[0] = '<li class="muted">' + OT.icon('star', 14) + ' ' + OT.esc(t('res.noRating', 'Rating unavailable at source')) + '</li>';
     if (x.distanceKm != null) facts.push('<li>' + OT.icon('pin', 14) + ' ' + OT.esc(t('res.dist', '{d} km from station', { d: x.distanceKm })) + '</li>');
@@ -277,7 +277,7 @@
     var tr = j.train;
 
     el.innerHTML = '<div class="container page results-page">' +
-      '<div class="page-head"><div><p class="eyebrow">' + OT.icon('train', 14) + ' <bdi class="keep">' + tr.no + '</bdi> ' + OT.esc(tr.name) + ' · <bdi class="keep">' + tr.from + '</bdi> → <bdi class="keep">' + tr.to + '</bdi> · <bdi class="keep">' + OT.esc(OT.fmtDate(tr.date)) + '</bdi></p>' +
+      '<div class="page-head"><div><p class="ot-eyebrow">' + OT.icon('train', 14) + ' <bdi class="keep">' + tr.no + '</bdi> ' + OT.esc(tr.name) + ' · <bdi class="keep">' + tr.from + '</bdi> → <bdi class="keep">' + tr.to + '</bdi> · <bdi class="keep">' + OT.esc(OT.fmtDate(tr.date)) + '</bdi></p>' +
       '<h1>' + OT.esc(t('res.title', 'Verified options near {city}', { city: D().stationName(to, lang) })) + '</h1>' +
       '<p>' + OT.esc(t('res.sub', 'Every price and timing comes from a provider source with a check time. Nothing is invented.')) + '</p></div>' +
       '<div class="row-wrap"><a class="btn btn-ghost btn-sm" href="#/home?to=' + to + '">' + OT.icon('edit', 15) + OT.esc(t('res.edit', 'Edit search')) + '</a>' +
@@ -300,6 +300,7 @@
     }
     var my = ++token;
     OT.state.running = true;
+    OT.state.resTab = 'hotel';
     traceEl.innerHTML = traceHTML({}, [], false);
     OT.agents.run(query, {
       lang: lang,

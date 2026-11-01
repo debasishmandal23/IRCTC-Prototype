@@ -127,7 +127,9 @@
       aur: 'और', raat: 'रात', din: 'दिन', subah: 'सुबह', shaam: 'शाम', kal: 'कल', aaj: 'आज', delhi: 'दिल्ली', dilli: 'दिल्ली', nayi: 'नई', wala: 'वाला', wali: 'वाली',
       achha: 'अच्छा', accha: 'अच्छा', sabse: 'सबसे', nazdeek: 'नज़दीक', najdik: 'नज़दीक', kitna: 'कितना', kitne: 'कितने', kaise: 'कैसे', kahan: 'कहाँ', batao: 'बताओ',
       bataiye: 'बताइए', karna: 'करना', karo: 'करो', kijiye: 'कीजिए', paisa: 'पैसा', paise: 'पैसे', wapas: 'वापस', vapas: 'वापस', ticket: 'टिकट', train: 'ट्रेन', yatra: 'यात्रा',
-      parivar: 'परिवार', shakahari: 'शाकाहारी', veg: 'वेज', chekin: 'चेक-इन', checkin: 'चेक-इन', jaldi: 'जल्दी', samaan: 'सामान', saman: 'सामान', madad: 'मदद', insaan: 'इंसान', baat: 'बात'
+      parivar: 'परिवार', shakahari: 'शाकाहारी', veg: 'वेज', chekin: 'चेक-इन', checkin: 'चेक-इन', jaldi: 'जल्दी', samaan: 'सामान', saman: 'सामान', madad: 'मदद', insaan: 'इंसान', baat: 'बात',
+      aayega: 'आएगा', ayega: 'आएगा', aaega: 'आएगा', aega: 'आएगा', aayegi: 'आएगी', hoga: 'होगा', hogi: 'होगी', milega: 'मिलेगा', milegi: 'मिलेगी', chahta: 'चाहता', chahti: 'चाहती',
+      batayein: 'बताएँ', status: 'स्टेटस', pura: 'पूरा', abhi: 'अभी', sahi: 'सही', galat: 'गलत', kyon: 'क्यों', kyun: 'क्यों', ghar: 'घर', jana: 'जाना', jaana: 'जाना'
     },
     ta: { enakku: 'எனக்கு', hotel: 'ஹோட்டல்', vendum: 'வேண்டும்', madurai: 'மதுரை', arugil: 'அருகில்', aruge: 'அருகே', rayil: 'ரயில்', nilaiyam: 'நிலையம்', station: 'ஸ்டேஷன்', rubai: 'ரூபாய்', ayiram: 'ஆயிரம்', kovil: 'கோவில்', sappadu: 'சாப்பாடு', taxi: 'டாக்ஸி' },
     bn: { amar: 'আমার', ami: 'আমি', hotel: 'হোটেল', chai: 'চাই', puri: 'পুরী', kache: 'কাছে', station: 'স্টেশন', taka: 'টাকা', hajar: 'হাজার', modhye: 'মধ্যে', mandir: 'মন্দির', khabar: 'খাবার', taxi: 'ট্যাক্সি' }
@@ -255,8 +257,13 @@
     rec.interimResults = true;
     rec.maxAlternatives = 1;
     rec.continuous = false;
-    var finalText = '', errored = false;
+    var finalText = '', errored = false, gotAny = false;
+    var guard = setTimeout(function () {
+      if (gotAny || errored) return;
+      errored = true; try { rec.abort(); } catch (e) { /* ignore */ } fail('no-speech');
+    }, opts.timeoutMs || 9000);
     rec.onresult = function (ev) {
+      gotAny = true;
       var interim = '', conf = 0.9;
       for (var i = ev.resultIndex; i < ev.results.length; i++) {
         var r = ev.results[i];
@@ -265,10 +272,14 @@
       try { if (interim && opts.onInterim) opts.onInterim(finalText + interim); } catch (e) { console.error(e); }
       if (finalText && opts.onResult) { try { opts.onResult(finalText.trim(), Math.round(conf * 100) / 100); } catch (e) { console.error(e); } }
     };
-    rec.onerror = function (ev) { errored = true; fail(ev && ev.error || 'error'); };
-    rec.onend = function () { activeRec = null; if (!errored && opts.onEnd) { try { opts.onEnd(); } catch (e) { /* ignore */ } } };
+    rec.onerror = function (ev) { clearTimeout(guard); if (errored) return; errored = true; fail(ev && ev.error || 'error'); };
+    rec.onend = function () {
+      clearTimeout(guard); activeRec = null;
+      if (!errored && !finalText && !gotAny) { errored = true; fail('no-speech'); return; }
+      if (!errored && opts.onEnd) { try { opts.onEnd(); } catch (e) { /* ignore */ } }
+    };
     try { rec.start(); activeRec = rec; } catch (e) { fail('error'); return null; }
-    return { stop: function () { try { rec.stop(); } catch (e) { /* ignore */ } } };
+    return { stop: function () { clearTimeout(guard); try { rec.stop(); } catch (e) { /* ignore */ } } };
   }
   function stopListening() { if (activeRec) { try { activeRec.abort(); } catch (e) { /* ignore */ } activeRec = null; } }
 

@@ -47,7 +47,7 @@
     var blocked = rows.some(function (r) { return r.blocked; });
     var m = METHODS[method];
     return '<div class="container page checkout-page">' +
-      '<div class="page-head"><div><p class="eyebrow">' + OT.icon('shield', 14) + ' ' + OT.esc(t('co.eyebrow', 'Human-in-the-loop: nothing is booked until you confirm')) + '</p>' +
+      '<div class="page-head"><div><p class="ot-eyebrow">' + OT.icon('shield', 14) + ' ' + OT.esc(t('co.eyebrow', 'Human-in-the-loop: nothing is booked until you confirm')) + '</p>' +
       '<h1>' + OT.esc(t('co.title', 'Review & pay')) + '</h1><p>' + OT.esc(t('co.sub', 'Simulated payment. No money moves and no real payment details are collected.')) + '</p></div>' +
       '<a class="btn btn-ghost btn-sm" href="#/journey">' + OT.icon('arrowLeft', 15) + OT.esc(t('co.back', 'Back to My Journey')) + '</a></div>' +
       '<div class="co-grid">' +
