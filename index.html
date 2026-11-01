@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IRCTC OneTrip</title>
+  <meta name="description" content="IRCTC OneTrip — one journey, one dashboard: AI-assisted, multilingual trip planning around your train. Academic prototype with simulated data.">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/traveller.css">
+  <link rel="stylesheet" href="css/dashboards.css">
+</head>
+<body>
+  <a class="sr-only" href="#view">Skip to content</a>
+
+  <div class="sim-banner" role="note">
+    <svg class="ic" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
+    <strong data-i18n="banner.title">Academic prototype</strong> ·
+    <span data-i18n="banner.text">All trains, hotels, cabs, prices and payments are simulated. No live IRCTC, BHASHINI or bank integration.</span>
+  </div>
+
+  <header class="app-header">
+    <div class="container">
+      <button class="icon-btn nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="main-nav"></button>
+      <a class="brand" href="#/home" aria-label="IRCTC OneTrip home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>IRCTC OneTrip<small data-i18n="brand.tag">One journey. One dashboard.</small></span>
+      </a>
+      <nav class="main-nav" id="main-nav" aria-label="Main">
+        <a href="#/home" data-nav="home" data-i18n="nav.plan">Plan trip</a>
+        <a href="#/journey" data-nav="journey" data-i18n="nav.journey">My Journey</a>
+        <a href="#/bookings" data-nav="bookings" data-i18n="nav.bookings">Bookings &amp; refunds</a>
+        <a href="#/partner" data-nav="partner" data-i18n="nav.partner">Partner</a>
+        <a href="#/admin" data-nav="admin" data-i18n="nav.admin">Admin &amp; Bank</a>
+        <a href="#/insights" data-nav="insights" data-i18n="nav.insights">Business case</a>
+      </nav>
+      <div class="header-tools">
+        <label class="lang-select" title="Language">
+          <span class="sr-only">Language</span>
+          <span id="lang-globe" aria-hidden="true"></span>
+          <select id="lang-select" aria-label="Select language"></select>
+        </label>
+        <button class="icon-btn" id="hdr-mic" aria-label="Voice search" title="Speak your query"></button>
+        <button class="icon-btn" id="hdr-assistant" aria-label="Open AI assistant" title="AI assistant"></button>
+        <button class="btn btn-accent btn-sm hide-sm" id="hdr-demo" data-i18n="nav.demo">Start demo</button>
+        <button class="icon-btn" id="hdr-settings" aria-label="Settings" title="Settings &amp; AI key"></button>
+        <a class="icon-btn" id="hdr-user" href="#/login" aria-label="Login" title="Login"></a>
+      </div>
+    </div>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <footer class="app-footer">
+    <div class="container">
+      <span>IRCTC OneTrip · Case 13 prototype · <span data-i18n="footer.note">Simulated data for academic demonstration. Not affiliated with IRCTC.</span></span>
+      <span><a href="#/insights">Business case</a> · <a href="#/about">How it works</a> · <a href="#/settings">Settings</a></span>
+    </div>
+  </footer>
+
+  <!-- Assistant drawer (built by js/views/assistant.js) -->
+  <aside id="assistant-root" aria-label="AI travel assistant"></aside>
+  <div id="tour-root"></div>
+  <div id="modal-root" class="modal-root"></div>
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+  <!-- Classic scripts (no modules) so this file runs by double-click from disk. Order matters. -->
+  <script src="js/core/util.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/i18n.js"></script>
+  <script src="js/core/ui.js"></script>
+  <script src="js/core/router.js"></script>
+
+  <script src="js/data/travel.js"></script>
+  <script src="js/data/analytics.js"></script>
+  <script src="js/data/survey.js"></script>
+
+  <script src="js/lib/charts.js"></script>
+  <script src="js/services/gemini.js"></script>
+  <script src="js/services/language.js"></script>
+
+  <script src="js/agents/agents.js"></script>
+  <script src="js/agents/orchestrator.js"></script>
+
+  <script src="js/views/shell.js"></script>
+  <script src="js/views/home.js"></script>
+  <script src="js/views/results.js"></script>
+  <script src="js/views/journey.js"></script>
+  <script src="js/views/checkout.js"></script>
+  <script src="js/views/bookings.js"></script>
+  <script src="js/views/assistant.js"></script>
+  <script src="js/views/auth.js"></script>
+  <script src="js/views/settings.js"></script>
+  <script src="js/views/partner.js"></script>
+  <script src="js/views/admin.js"></script>
+  <script src="js/views/insights.js"></script>
+  <script src="js/views/about.js"></script>
+  <script src="js/tour.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

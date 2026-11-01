@@ -1,0 +1,8 @@
+# Never commit secrets
+config.js
+*.local.js
+.env
+# OS / editor
+.DS_Store
+Thumbs.db
+node_modules/

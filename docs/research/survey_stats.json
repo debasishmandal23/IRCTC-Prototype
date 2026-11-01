@@ -1,0 +1,1112 @@
+{
+ "meta": {
+  "source": "IRCTC OneTrip 10-Question Customer Survey (Google Form, sheet \"Form Responses 1\")",
+  "n_responses": 52,
+  "fieldwork": "2026-10-28 to 2026-10-31",
+  "question_text": {
+   "last_travel": "Q1. When did you last travel by train in India?",
+   "frequency": "Q2. How often do you typically travel by train?",
+   "booking_channel": "Q3. Where do you usually book your train ticket?",
+   "addon_services": "Q4. When planning a train trip, which additional services do you usually arrange?",
+   "ease_of_organising": "Q5. How easy or difficult is it to organise a trip involving train travel?",
+   "difficulties": "Q6. Which difficulties do you face when planning a train trip?",
+   "usefulness": "Q7. How useful would OneTrip be for your future train trips?",
+   "most_valuable_feature": "Q8. Which OneTrip feature would be most valuable to you?",
+   "likelihood_to_explore": "Q9. If OneTrip offered relevant services, competitive prices and clear terms, how likely would you be to explore it?",
+   "biggest_concern": "Q10. What would be your biggest concern about using OneTrip?"
+  },
+  "notes": [
+   "Multi-select questions (addon_services, difficulties): pct = % of respondents selecting option; sums exceed 100.",
+   "Likert scales 1-5. usefulness: 1 = not at all useful, 5 = extremely useful. likelihood_to_explore: 1 = very unlikely, 5 = very likely. ease_of_organising: 1 = very easy, 5 = very difficult (anchors per BRD v2.0 s.22.3), so its top2_box_pct = % finding it DIFFICULT.",
+   "Survey has NO questions on language preference, voice use, willingness to pay, age, city or travel purpose - do not chart these.",
+   "Convenience sample of 52; directional, not statistically representative."
+  ]
+ },
+ "questions": {
+  "last_travel": {
+   "question": "Q1. When did you last travel by train in India?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Within the past 3 months",
+     "count": 17,
+     "pct": 32.7
+    },
+    {
+     "label": "3–12 months ago",
+     "count": 20,
+     "pct": 38.5
+    },
+    {
+     "label": "More than a year ago",
+     "count": 15,
+     "pct": 28.8
+    }
+   ]
+  },
+  "frequency": {
+   "question": "Q2. How often do you typically travel by train?",
+   "type": "single",
+   "options": [
+    {
+     "label": "At least once a month",
+     "count": 4,
+     "pct": 7.7
+    },
+    {
+     "label": "Every 2–3 months",
+     "count": 11,
+     "pct": 21.2
+    },
+    {
+     "label": "A few times a year",
+     "count": 17,
+     "pct": 32.7
+    },
+    {
+     "label": "Once a year or less",
+     "count": 20,
+     "pct": 38.5
+    }
+   ]
+  },
+  "booking_channel": {
+   "question": "Q3. Where do you usually book your train ticket?",
+   "type": "single",
+   "options": [
+    {
+     "label": "IRCTC website",
+     "count": 22,
+     "pct": 42.3
+    },
+    {
+     "label": "IRCTC Rail Connect app",
+     "count": 19,
+     "pct": 36.5
+    },
+    {
+     "label": "Travel agent / another platform",
+     "count": 5,
+     "pct": 9.6
+    },
+    {
+     "label": "MakeMyTrip / Goibibo",
+     "count": 4,
+     "pct": 7.7
+    },
+    {
+     "label": "Someone else usually books for me",
+     "count": 2,
+     "pct": 3.8
+    }
+   ]
+  },
+  "addon_services": {
+   "question": "Q4. When planning a train trip, which additional services do you usually arrange?",
+   "type": "multi",
+   "options": [
+    {
+     "label": "I do not usually arrange additional services",
+     "count": 23,
+     "pct": 44.2
+    },
+    {
+     "label": "Hotel / accommodation",
+     "count": 16,
+     "pct": 30.8
+    },
+    {
+     "label": "Travel insurance",
+     "count": 11,
+     "pct": 21.2
+    },
+    {
+     "label": "Local transport / station transfer",
+     "count": 10,
+     "pct": 19.2
+    },
+    {
+     "label": "Food delivery",
+     "count": 7,
+     "pct": 13.5
+    },
+    {
+     "label": "Sightseeing / tourism",
+     "count": 5,
+     "pct": 9.6
+    },
+    {
+     "label": "Other",
+     "count": 2,
+     "pct": 3.8
+    }
+   ],
+   "avg_selections_per_respondent": 1.42
+  },
+  "ease_of_organising": {
+   "question": "Q5. How easy or difficult is it to organise a trip involving train travel?",
+   "type": "likert",
+   "options": [
+    {
+     "label": "1",
+     "count": 7,
+     "pct": 13.5
+    },
+    {
+     "label": "2",
+     "count": 15,
+     "pct": 28.8
+    },
+    {
+     "label": "3",
+     "count": 14,
+     "pct": 26.9
+    },
+    {
+     "label": "4",
+     "count": 14,
+     "pct": 26.9
+    },
+    {
+     "label": "5",
+     "count": 2,
+     "pct": 3.8
+    }
+   ],
+   "mean": 2.79,
+   "median": 3.0,
+   "top2_box_pct": 30.8,
+   "bottom2_box_pct": 42.3,
+   "scale": "1 = very easy ... 5 = very difficult",
+   "difficult_4_5_pct": 30.8,
+   "easy_1_2_pct": 42.3
+  },
+  "difficulties": {
+   "question": "Q6. Which difficulties do you face when planning a train trip?",
+   "type": "multi",
+   "options": [
+    {
+     "label": "Coordinating arrival time with check-in / other bookings",
+     "count": 19,
+     "pct": 36.5
+    },
+    {
+     "label": "No significant difficulties",
+     "count": 16,
+     "pct": 30.8
+    },
+    {
+     "label": "Arranging local transport",
+     "count": 12,
+     "pct": 23.1
+    },
+    {
+     "label": "Finding suitable accommodation",
+     "count": 11,
+     "pct": 21.2
+    },
+    {
+     "label": "Keeping track of multiple bookings",
+     "count": 11,
+     "pct": 21.2
+    },
+    {
+     "label": "Comparing prices across providers",
+     "count": 10,
+     "pct": 19.2
+    },
+    {
+     "label": "Other",
+     "count": 8,
+     "pct": 15.4
+    },
+    {
+     "label": "Trusting providers or understanding cancellation/refund terms",
+     "count": 7,
+     "pct": 13.5
+    },
+    {
+     "label": "Discovering activities at the destination",
+     "count": 4,
+     "pct": 7.7
+    }
+   ],
+   "avg_selections_per_respondent": 1.88
+  },
+  "usefulness": {
+   "question": "Q7. How useful would OneTrip be for your future train trips?",
+   "type": "likert",
+   "options": [
+    {
+     "label": "1",
+     "count": 4,
+     "pct": 7.7
+    },
+    {
+     "label": "2",
+     "count": 8,
+     "pct": 15.4
+    },
+    {
+     "label": "3",
+     "count": 11,
+     "pct": 21.2
+    },
+    {
+     "label": "4",
+     "count": 23,
+     "pct": 44.2
+    },
+    {
+     "label": "5",
+     "count": 6,
+     "pct": 11.5
+    }
+   ],
+   "mean": 3.37,
+   "median": 4.0,
+   "top2_box_pct": 55.8,
+   "bottom2_box_pct": 23.1,
+   "scale": "1 = not at all useful ... 5 = extremely useful"
+  },
+  "most_valuable_feature": {
+   "question": "Q8. Which OneTrip feature would be most valuable to you?",
+   "type": "single",
+   "options": [
+    {
+     "label": "See journey details and selected arrangements in one place",
+     "count": 19,
+     "pct": 36.5
+    },
+    {
+     "label": "Arrange local transport / station transfers",
+     "count": 12,
+     "pct": 23.1
+    },
+    {
+     "label": "Find accommodation relevant to my destination and dates",
+     "count": 11,
+     "pct": 21.2
+    },
+    {
+     "label": "See transparent prices, ratings and cancellation terms",
+     "count": 7,
+     "pct": 13.5
+    },
+    {
+     "label": "Discover sightseeing and tourism experiences",
+     "count": 2,
+     "pct": 3.8
+    },
+    {
+     "label": "None of these",
+     "count": 1,
+     "pct": 1.9
+    }
+   ]
+  },
+  "likelihood_to_explore": {
+   "question": "Q9. If OneTrip offered relevant services, competitive prices and clear terms, how likely would you be to explore it?",
+   "type": "likert",
+   "options": [
+    {
+     "label": "1",
+     "count": 2,
+     "pct": 3.8
+    },
+    {
+     "label": "2",
+     "count": 6,
+     "pct": 11.5
+    },
+    {
+     "label": "3",
+     "count": 8,
+     "pct": 15.4
+    },
+    {
+     "label": "4",
+     "count": 16,
+     "pct": 30.8
+    },
+    {
+     "label": "5",
+     "count": 20,
+     "pct": 38.5
+    }
+   ],
+   "mean": 3.88,
+   "median": 4.0,
+   "top2_box_pct": 69.2,
+   "bottom2_box_pct": 15.4,
+   "scale": "1 = very unlikely ... 5 = very likely"
+  },
+  "biggest_concern": {
+   "question": "Q10. What would be your biggest concern about using OneTrip?",
+   "type": "single",
+   "options": [
+    {
+     "label": "Unclear cancellation, refund or customer-support responsibility",
+     "count": 12,
+     "pct": 23.1
+    },
+    {
+     "label": "Provider/service reliability",
+     "count": 11,
+     "pct": 21.2
+    },
+    {
+     "label": "I prefer using separate apps",
+     "count": 8,
+     "pct": 15.4
+    },
+    {
+     "label": "Too many promotions",
+     "count": 7,
+     "pct": 13.5
+    },
+    {
+     "label": "Prices may not be competitive",
+     "count": 5,
+     "pct": 9.6
+    },
+    {
+     "label": "Data privacy",
+     "count": 4,
+     "pct": 7.7
+    },
+    {
+     "label": "No major concern",
+     "count": 4,
+     "pct": 7.7
+    },
+    {
+     "label": "Other",
+     "count": 1,
+     "pct": 1.9
+    }
+   ]
+  }
+ },
+ "headline": {
+  "books_on_irctc_pct": 78.8,
+  "books_on_irctc_count": 41,
+  "books_elsewhere_or_otas_pct": 21.2,
+  "arranges_at_least_one_addon_pct": 61.5,
+  "arranges_at_least_one_addon_count": 32,
+  "arranges_2plus_addons_pct": 21.2,
+  "arranges_nothing_extra_only_pct": 34.6,
+  "reports_at_least_one_real_difficulty_pct": 67.3,
+  "reports_at_least_one_real_difficulty_count": 35,
+  "coordination_pain_pct": 36.5,
+  "usefulness_top2_pct": 55.8,
+  "explore_top2_pct": 69.2,
+  "trust_related_concern_pct": 44.2,
+  "one_place_dashboard_top_feature_pct": 36.5,
+  "travelled_within_12m_pct": 71.2,
+  "data_quality": {
+   "addon_none_plus_service_contradictions": 5,
+   "difficulty_none_plus_difficulty_contradictions": 5
+  }
+ },
+ "crosstabs": {
+  "frequency_vs_explore": [
+   {
+    "segment": "At least once a month",
+    "n": 4,
+    "mean": 4.5,
+    "top2_pct": 75.0
+   },
+   {
+    "segment": "Every 2–3 months",
+    "n": 11,
+    "mean": 3.91,
+    "top2_pct": 72.7
+   },
+   {
+    "segment": "A few times a year",
+    "n": 17,
+    "mean": 3.47,
+    "top2_pct": 58.8
+   },
+   {
+    "segment": "Once a year or less",
+    "n": 20,
+    "mean": 4.1,
+    "top2_pct": 75.0
+   }
+  ],
+  "frequency_vs_usefulness": [
+   {
+    "segment": "At least once a month",
+    "n": 4,
+    "mean": 3.5,
+    "top2_pct": 50.0
+   },
+   {
+    "segment": "Every 2–3 months",
+    "n": 11,
+    "mean": 3.27,
+    "top2_pct": 54.5
+   },
+   {
+    "segment": "A few times a year",
+    "n": 17,
+    "mean": 2.76,
+    "top2_pct": 41.2
+   },
+   {
+    "segment": "Once a year or less",
+    "n": 20,
+    "mean": 3.9,
+    "top2_pct": 70.0
+   }
+  ],
+  "channel_vs_explore": [
+   {
+    "segment": "IRCTC Rail Connect app",
+    "n": 19,
+    "mean": 3.63,
+    "top2_pct": 63.2
+   },
+   {
+    "segment": "IRCTC website",
+    "n": 22,
+    "mean": 4.0,
+    "top2_pct": 72.7
+   },
+   {
+    "segment": "MakeMyTrip / Goibibo",
+    "n": 4,
+    "mean": 4.5,
+    "top2_pct": 100.0
+   },
+   {
+    "segment": "Travel agent / another platform",
+    "n": 5,
+    "mean": 3.4,
+    "top2_pct": 40.0
+   },
+   {
+    "segment": "Someone else usually books for me",
+    "n": 2,
+    "mean": 5.0,
+    "top2_pct": 100.0
+   }
+  ],
+  "addon_count_vs_usefulness": [
+   {
+    "segment": "0 add-ons",
+    "n": 20,
+    "mean": 3.4,
+    "top2_pct": 50.0
+   },
+   {
+    "segment": "1 add-on",
+    "n": 21,
+    "mean": 3.24,
+    "top2_pct": 52.4
+   },
+   {
+    "segment": "2+ add-ons",
+    "n": 11,
+    "mean": 3.55,
+    "top2_pct": 72.7
+   }
+  ],
+  "addon_count_vs_explore": [
+   {
+    "segment": "0 add-ons",
+    "n": 20,
+    "mean": 3.75,
+    "top2_pct": 55.0
+   },
+   {
+    "segment": "1 add-on",
+    "n": 21,
+    "mean": 3.95,
+    "top2_pct": 76.2
+   },
+   {
+    "segment": "2+ add-ons",
+    "n": 11,
+    "mean": 4.0,
+    "top2_pct": 81.8
+   }
+  ],
+  "pain_vs_usefulness": [
+   {
+    "segment": "Reports a planning difficulty",
+    "n": 35,
+    "mean": 3.6,
+    "top2_pct": 68.6
+   },
+   {
+    "segment": "No real difficulty",
+    "n": 17,
+    "mean": 2.88,
+    "top2_pct": 29.4
+   }
+  ],
+  "pain_vs_explore": [
+   {
+    "segment": "Reports a planning difficulty",
+    "n": 35,
+    "mean": 4.03,
+    "top2_pct": 74.3
+   },
+   {
+    "segment": "No real difficulty",
+    "n": 17,
+    "mean": 3.59,
+    "top2_pct": 58.8
+   }
+  ],
+  "concern_vs_explore": [
+   {
+    "segment": "Unclear cancellation, refund or customer-support responsibility",
+    "n": 12,
+    "mean": 4.42,
+    "top2_pct": 75.0
+   },
+   {
+    "segment": "Provider/service reliability",
+    "n": 11,
+    "mean": 4.18,
+    "top2_pct": 81.8
+   },
+   {
+    "segment": "I prefer using separate apps",
+    "n": 8,
+    "mean": 3.25,
+    "top2_pct": 62.5
+   },
+   {
+    "segment": "Too many promotions",
+    "n": 7,
+    "mean": 3.57,
+    "top2_pct": 57.1
+   },
+   {
+    "segment": "Prices may not be competitive",
+    "n": 5,
+    "mean": 4.0,
+    "top2_pct": 80.0
+   },
+   {
+    "segment": "Data privacy",
+    "n": 4,
+    "mean": 3.25,
+    "top2_pct": 50.0
+   },
+   {
+    "segment": "No major concern",
+    "n": 4,
+    "mean": 4.25,
+    "top2_pct": 75.0
+   },
+   {
+    "segment": "Other",
+    "n": 1,
+    "mean": 2.0,
+    "top2_pct": 0.0
+   }
+  ],
+  "feature_vs_explore": [
+   {
+    "segment": "See journey details and selected arrangements in one place",
+    "n": 19,
+    "mean": 4.0,
+    "top2_pct": 73.7
+   },
+   {
+    "segment": "Arrange local transport / station transfers",
+    "n": 12,
+    "mean": 3.75,
+    "top2_pct": 58.3
+   },
+   {
+    "segment": "Find accommodation relevant to my destination and dates",
+    "n": 11,
+    "mean": 4.18,
+    "top2_pct": 81.8
+   },
+   {
+    "segment": "See transparent prices, ratings and cancellation terms",
+    "n": 7,
+    "mean": 3.43,
+    "top2_pct": 57.1
+   },
+   {
+    "segment": "Discover sightseeing and tourism experiences",
+    "n": 2,
+    "mean": 5.0,
+    "top2_pct": 100.0
+   },
+   {
+    "segment": "None of these",
+    "n": 1,
+    "mean": 1.0,
+    "top2_pct": 0.0
+   }
+  ],
+  "hotel_bookers": {
+   "n": 16,
+   "pct_citing_coordination": 50.0,
+   "pct_citing_accommodation": 50.0,
+   "pct_choose_one_place_feature": 50.0,
+   "explore_top2_pct": 81.2
+  },
+  "difficulty_x_feature_counts": {
+   "rows": [
+    "Coordinating arrival time with check-in / other bookings",
+    "No significant difficulties",
+    "Arranging local transport",
+    "Finding suitable accommodation",
+    "Keeping track of multiple bookings",
+    "Comparing prices across providers",
+    "Other",
+    "Trusting providers or understanding cancellation/refund terms",
+    "Discovering activities at the destination"
+   ],
+   "cols": [
+    "See journey details and selected arrangements in one place",
+    "Arrange local transport / station transfers",
+    "Find accommodation relevant to my destination and dates",
+    "See transparent prices, ratings and cancellation terms",
+    "Discover sightseeing and tourism experiences",
+    "None of these"
+   ],
+   "values": [
+    [
+     8,
+     1,
+     5,
+     5,
+     0,
+     0
+    ],
+    [
+     5,
+     3,
+     5,
+     2,
+     0,
+     1
+    ],
+    [
+     4,
+     3,
+     3,
+     2,
+     0,
+     0
+    ],
+    [
+     4,
+     1,
+     5,
+     1,
+     0,
+     0
+    ],
+    [
+     6,
+     2,
+     1,
+     2,
+     0,
+     0
+    ],
+    [
+     5,
+     2,
+     1,
+     2,
+     0,
+     0
+    ],
+    [
+     1,
+     3,
+     1,
+     2,
+     1,
+     0
+    ],
+    [
+     2,
+     1,
+     2,
+     2,
+     0,
+     0
+    ],
+    [
+     1,
+     1,
+     1,
+     0,
+     1,
+     0
+    ]
+   ]
+  },
+  "ease_vs_usefulness": [
+   {
+    "segment": "1",
+    "n": 7,
+    "mean": 3.43,
+    "top2_pct": 57.1
+   },
+   {
+    "segment": "2",
+    "n": 15,
+    "mean": 3.53,
+    "top2_pct": 53.3
+   },
+   {
+    "segment": "3",
+    "n": 14,
+    "mean": 3.14,
+    "top2_pct": 50.0
+   },
+   {
+    "segment": "4",
+    "n": 14,
+    "mean": 3.21,
+    "top2_pct": 57.1
+   },
+   {
+    "segment": "5",
+    "n": 2,
+    "mean": 4.5,
+    "top2_pct": 100.0
+   }
+  ],
+  "usefulness_x_explore_counts": {
+   "rows_usefulness": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "cols_explore": [
+    1,
+    2,
+    3,
+    4,
+    5
+   ],
+   "values": [
+    [
+     2,
+     1,
+     0,
+     0,
+     1
+    ],
+    [
+     0,
+     5,
+     1,
+     1,
+     1
+    ],
+    [
+     0,
+     0,
+     3,
+     4,
+     4
+    ],
+    [
+     0,
+     0,
+     3,
+     10,
+     10
+    ],
+    [
+     0,
+     0,
+     1,
+     1,
+     4
+    ]
+   ]
+  }
+ },
+ "segments": [
+  {
+   "segment": "Frequent (every 2-3 months or more)",
+   "n": 15,
+   "top_addons": {
+    "I do not usually arrange additional services": 8,
+    "Hotel / accommodation": 4,
+    "Food delivery": 4
+   },
+   "top_difficulties": {
+    "Coordinating arrival time with check-in / other bookings": 5,
+    "Arranging local transport": 4,
+    "Keeping track of multiple bookings": 4
+   },
+   "top_feature": {
+    "See journey details and selected arrangements in one place": 8,
+    "Arrange local transport / station transfers": 5
+   },
+   "top_concern": {
+    "Unclear cancellation, refund or customer-support responsibility": 4,
+    "Data privacy": 3
+   },
+   "explore_top2_pct": 73.3,
+   "usefulness_mean": 3.33
+  },
+  {
+   "segment": "Occasional (a few times a year)",
+   "n": 17,
+   "top_addons": {
+    "I do not usually arrange additional services": 7,
+    "Travel insurance": 6,
+    "Hotel / accommodation": 4
+   },
+   "top_difficulties": {
+    "No significant difficulties": 6,
+    "Coordinating arrival time with check-in / other bookings": 6,
+    "Other": 4
+   },
+   "top_feature": {
+    "See journey details and selected arrangements in one place": 5,
+    "Find accommodation relevant to my destination and dates": 5
+   },
+   "top_concern": {
+    "I prefer using separate apps": 5,
+    "Provider/service reliability": 5
+   },
+   "explore_top2_pct": 58.8,
+   "usefulness_mean": 2.76
+  },
+  {
+   "segment": "Infrequent (once a year or less)",
+   "n": 20,
+   "top_addons": {
+    "Hotel / accommodation": 8,
+    "I do not usually arrange additional services": 8,
+    "Local transport / station transfer": 5
+   },
+   "top_difficulties": {
+    "Coordinating arrival time with check-in / other bookings": 8,
+    "Comparing prices across providers": 7,
+    "Finding suitable accommodation": 6
+   },
+   "top_feature": {
+    "See journey details and selected arrangements in one place": 6,
+    "Find accommodation relevant to my destination and dates": 5
+   },
+   "top_concern": {
+    "Unclear cancellation, refund or customer-support responsibility": 6,
+    "Provider/service reliability": 4
+   },
+   "explore_top2_pct": 75.0,
+   "usefulness_mean": 3.9
+  },
+  {
+   "segment": "Arranges hotel",
+   "n": 16,
+   "top_addons": {
+    "Hotel / accommodation": 16,
+    "Local transport / station transfer": 7,
+    "Sightseeing / tourism": 5
+   },
+   "top_difficulties": {
+    "Finding suitable accommodation": 8,
+    "Coordinating arrival time with check-in / other bookings": 8,
+    "Arranging local transport": 6
+   },
+   "top_feature": {
+    "See journey details and selected arrangements in one place": 8,
+    "Find accommodation relevant to my destination and dates": 7
+   },
+   "top_concern": {
+    "Prices may not be competitive": 5,
+    "Too many promotions": 3
+   },
+   "explore_top2_pct": 81.2,
+   "usefulness_mean": 3.44
+  },
+  {
+   "segment": "Books outside IRCTC",
+   "n": 11,
+   "top_addons": {
+    "Hotel / accommodation": 4,
+    "Travel insurance": 3,
+    "I do not usually arrange additional services": 3
+   },
+   "top_difficulties": {
+    "No significant difficulties": 5,
+    "Arranging local transport": 2,
+    "Coordinating arrival time with check-in / other bookings": 2
+   },
+   "top_feature": {
+    "See journey details and selected arrangements in one place": 3,
+    "Find accommodation relevant to my destination and dates": 3
+   },
+   "top_concern": {
+    "Prices may not be competitive": 3,
+    "I prefer using separate apps": 2
+   },
+   "explore_top2_pct": 72.7,
+   "usefulness_mean": 3.0
+  }
+ ],
+ "illustrative_business_model": {
+  "LABEL": "ILLUSTRATIVE ASSUMPTIONS - not survey or case data",
+  "basis": {
+   "volume": "6 lakh tickets/day average assumed (~48% of case-reported peak capacity of 12.38 lakh/day); treated as bookings eligible to see OneTrip post-booking card.",
+   "hotel_aov": "Rs 2,500/night x 1.5 nights; aligned with brief example of a Rs 3,000-cap hotel near Chandigarh station.",
+   "take_rates": "Typical marketplace commission bands assumed (hotel 12%, cab 10%, meals 15%, tours 15%); to be validated with partners.",
+   "attach_rates": "Base hotel attach 3% vs 30.8% of survey respondents who usually arrange a hotel, i.e. assumes ~1 in 10 hotel-arrangers books via OneTrip."
+  },
+  "scenarios": {
+   "Conservative": {
+    "per_100k_bookings": [
+     {
+      "line": "Hotel / stay",
+      "attach_rate_pct": 1.5,
+      "aov_inr": 3750,
+      "take_rate_pct": 12.0,
+      "orders": 1500,
+      "gbv_inr": 5625000,
+      "net_revenue_inr": 675000
+     },
+     {
+      "line": "Station transfer / cab",
+      "attach_rate_pct": 2.0,
+      "aov_inr": 450,
+      "take_rate_pct": 10.0,
+      "orders": 2000,
+      "gbv_inr": 900000,
+      "net_revenue_inr": 90000
+     },
+     {
+      "line": "E-catering meal",
+      "attach_rate_pct": 3.0,
+      "aov_inr": 250,
+      "take_rate_pct": 15.0,
+      "orders": 3000,
+      "gbv_inr": 750000,
+      "net_revenue_inr": 112500
+     },
+     {
+      "line": "Sightseeing / tour",
+      "attach_rate_pct": 0.5,
+      "aov_inr": 1200,
+      "take_rate_pct": 15.0,
+      "orders": 500,
+      "gbv_inr": 600000,
+      "net_revenue_inr": 90000
+     }
+    ],
+    "gbv_per_100k_inr": 7875000,
+    "net_rev_per_100k_inr": 967500,
+    "net_rev_per_booking_inr": 9.68,
+    "gbv_per_booking_inr": 78.8,
+    "annual_net_rev_inr_cr_at_6lakh_tickets_per_day": 211.9,
+    "annual_gbv_inr_cr": 1724.6
+   },
+   "Base": {
+    "per_100k_bookings": [
+     {
+      "line": "Hotel / stay",
+      "attach_rate_pct": 3.0,
+      "aov_inr": 3750,
+      "take_rate_pct": 12.0,
+      "orders": 3000,
+      "gbv_inr": 11250000,
+      "net_revenue_inr": 1350000
+     },
+     {
+      "line": "Station transfer / cab",
+      "attach_rate_pct": 4.0,
+      "aov_inr": 450,
+      "take_rate_pct": 10.0,
+      "orders": 4000,
+      "gbv_inr": 1800000,
+      "net_revenue_inr": 180000
+     },
+     {
+      "line": "E-catering meal",
+      "attach_rate_pct": 5.0,
+      "aov_inr": 250,
+      "take_rate_pct": 15.0,
+      "orders": 5000,
+      "gbv_inr": 1250000,
+      "net_revenue_inr": 187500
+     },
+     {
+      "line": "Sightseeing / tour",
+      "attach_rate_pct": 1.0,
+      "aov_inr": 1200,
+      "take_rate_pct": 15.0,
+      "orders": 1000,
+      "gbv_inr": 1200000,
+      "net_revenue_inr": 180000
+     }
+    ],
+    "gbv_per_100k_inr": 15500000,
+    "net_rev_per_100k_inr": 1897500,
+    "net_rev_per_booking_inr": 18.98,
+    "gbv_per_booking_inr": 155.0,
+    "annual_net_rev_inr_cr_at_6lakh_tickets_per_day": 415.6,
+    "annual_gbv_inr_cr": 3394.5
+   },
+   "Upside": {
+    "per_100k_bookings": [
+     {
+      "line": "Hotel / stay",
+      "attach_rate_pct": 5.0,
+      "aov_inr": 3750,
+      "take_rate_pct": 12.0,
+      "orders": 5000,
+      "gbv_inr": 18750000,
+      "net_revenue_inr": 2250000
+     },
+     {
+      "line": "Station transfer / cab",
+      "attach_rate_pct": 6.0,
+      "aov_inr": 450,
+      "take_rate_pct": 10.0,
+      "orders": 6000,
+      "gbv_inr": 2700000,
+      "net_revenue_inr": 270000
+     },
+     {
+      "line": "E-catering meal",
+      "attach_rate_pct": 7.0,
+      "aov_inr": 250,
+      "take_rate_pct": 15.0,
+      "orders": 7000,
+      "gbv_inr": 1750000,
+      "net_revenue_inr": 262500
+     },
+     {
+      "line": "Sightseeing / tour",
+      "attach_rate_pct": 2.0,
+      "aov_inr": 1200,
+      "take_rate_pct": 15.0,
+      "orders": 2000,
+      "gbv_inr": 2400000,
+      "net_revenue_inr": 360000
+     }
+    ],
+    "gbv_per_100k_inr": 25600000,
+    "net_rev_per_100k_inr": 3142500,
+    "net_rev_per_booking_inr": 31.43,
+    "gbv_per_booking_inr": 256.0,
+    "annual_net_rev_inr_cr_at_6lakh_tickets_per_day": 688.2,
+    "annual_gbv_inr_cr": 5606.4
+   }
+  }
+ }
+}
