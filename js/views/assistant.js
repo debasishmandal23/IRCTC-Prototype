@@ -90,6 +90,20 @@
     busy = true; renderMsgs();
     // If the traveller writes in another language than the UI, answer in the language they used.
     var replyLang = det.confidence >= 0.7 && det.code !== lang && det.script !== 'Latn' ? det.code : lang;
+    var cmd = !opts.intent && OT.agents.parseCommand ? OT.agents.parseCommand(text) : null;
+    if (cmd && cmd.intent === 'train' && cmd.to) {
+      return OT.sleep(350).then(function () {
+        busy = false;
+        var date = cmd.date || OT.trains.tomorrow(), sn = function (c) { return OT.data.travel.stationName(c, replyLang); };
+        var res = cmd.from ? { text: OT.i18n.tIn(replyLang, 'asst.trainReply', 'I can search trains {from} → {to} on {date}. Tap below to see timings, fares and seats (simulated).', { from: sn(cmd.from), to: sn(cmd.to), date: OT.fmtDate(date) }),
+          confidence: 0.9, engine: 'rules', actions: [{ label: OT.i18n.tIn(replyLang, 'trn.search', 'Search trains'), route: OT.trains.path({ from: cmd.from, to: cmd.to, date: date, cls: cmd.cls || '', pax: cmd.pax || '', heard: text }) }] }
+          : { text: OT.i18n.tIn(replyLang, 'asst.trainFrom', 'Train to {to}: from which station are you travelling?', { to: sn(cmd.to) }), confidence: 0.7, engine: 'rules', actions: [] };
+        var m = { role: 'bot', lang: replyLang, res: res };
+        msgs.push(m); renderMsgs();
+        if (opts.speak) OT.lang.speak(res.text, replyLang);
+        return m;
+      });
+    }
     return OT.sleep(450).then(function () {
       return OT.agents.support(text, { lang: replyLang, intent: opts.intent });
     }).then(function (res) {
@@ -131,7 +145,7 @@
   function translitHint() {
     var inp = el.querySelector('#asst-in'), box = el.querySelector('#asst-translit');
     var v = inp.value, lang = L();
-    var target = lang === 'en' ? (OT.lang.detect(v).romanised ? 'hi' : null) : lang;
+    var dv = OT.lang.detect(v), target = dv.romanised ? 'hi' : (dv.code === 'en' ? null : lang);
     var r = target && /[A-Za-z]{3,}/.test(v) ? OT.lang.transliterate(v, target) : null;
     if (r && r.changed) {
       box.classList.remove('hidden');

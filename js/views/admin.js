@@ -83,7 +83,7 @@
   function live() { return A().live(); }
   function totalsWithLive() {
     var a = A(), l = live();
-    return { orders: a.totals.orders + l.confirmed.length, gtv: a.totals.gtv + l.gtv, liveN: l.all.length, liveGtv: l.gtv, liveConfirmed: l.confirmed.length };
+    return { orders: a.totals.orders + l.confirmed.length, gtv: a.totals.gtv + l.gtv, liveN: l.all.length, liveGtv: l.gtv, liveConfirmed: l.confirmed.length, liveTrains: l.trains.length, liveTrainValue: l.trainValue };
   }
   function liveFeed() {
     var l = live().all.slice().sort(function (a, b) { return String(b.paidAt || '').localeCompare(String(a.paidAt || '')); }).slice(0, 6);
@@ -106,7 +106,7 @@
       { label: t('admin.k.gtv', 'GTV · 12 wk'), value: K.cr(tw.gtv), hi: true, note: t('admin.k.gtvNote', 'add-on transaction value') + (tw.liveN ? ' · ' + t('admin.inclLive', 'incl. live') : ''), spark: a.gtv },
       { label: t('admin.k.attach', 'Attach rate'), value: a.attach[11].toFixed(2) + '%', delta: (a.attach[11] - a.attach[0]).toFixed(2) + ' pp', dir: 'up', deltaNote: t('admin.since', 'since 9 Aug'), spark: a.attach },
       { label: t('admin.k.compl', 'Complaints / 1,000 orders'), value: a.complaints.per1000[11].toFixed(1), delta: (a.complaints.per1000[0] - a.complaints.per1000[11]).toFixed(1), dir: 'down', good: true, deltaNote: t('admin.lower', 'lower is better'), spark: a.complaints.per1000 }
-    ], OT.simTag() + '<span>' + esc(a.note) + '</span>' + (tw.liveN ? '<span class="pill pill-live">' + esc(t('admin.liveIncl', '{n} live booking(s) · {v} added to totals', { n: tw.liveN, v: OT.inr(tw.liveGtv) })) + '</span>' : ''));
+    ], OT.simTag() + '<span>' + esc(a.note) + '</span>' + (tw.liveN ? '<span class="pill pill-live">' + esc(t('admin.liveIncl', '{n} live booking(s) · {v} added to totals', { n: tw.liveN, v: OT.inr(tw.liveGtv) }) + (tw.liveTrains ? ' · ' + t('admin.liveTrains', '{n} train ticket(s) {v} counted as IRCTC ticketing, not add-on GTV', { n: tw.liveTrains, v: OT.inr(tw.liveTrainValue) }) : '')) + '</span>' : ''));
     body.innerHTML += '<div class="split" style="margin-top:18px">' +
       K.pane(t('admin.gtvWeekly', 'Weekly GTV by service line'), esc(t('admin.gtvWeeklySub', '₹ · hotels drive value, cabs and meals drive frequency')), C.stacked(a.weeks, catSeries, { fmt: OT.inr, label: 'Weekly GTV by service line', totalLabels: !C.narrow() })) +
       K.pane(t('admin.liveFeed', 'Live booking feed'), '<span class="pill pill-live">' + esc(t('admin.listening', 'listening to this browser')) + '</span>', liveFeed()) + '</div>';
@@ -153,7 +153,7 @@
       { label: t('admin.k.gtv', 'GTV · 12 wk'), value: K.cr(tw.gtv), hi: true, spark: a.gtv },
       { label: t('admin.k.comm', 'Gross commission'), value: K.cr(a.totals.commission), note: t('admin.take', 'blended take-rate') + ' ' + (a.totals.takeRate * 100).toFixed(1) + '%' },
       { label: t('admin.k.attach', 'Attach rate'), value: a.attach[11].toFixed(2) + '%', note: t('admin.attachNote', 'trips with add-on ÷ eligible tickets'), spark: a.attach }
-    ], tw.liveN ? '<span class="pill pill-live">' + esc(t('admin.liveIncl', '{n} live booking(s) · {v} added to totals', { n: tw.liveN, v: OT.inr(tw.liveGtv) })) + '</span>' : '') +
+    ], tw.liveN ? '<span class="pill pill-live">' + esc(t('admin.liveIncl', '{n} live booking(s) · {v} added to totals', { n: tw.liveN, v: OT.inr(tw.liveGtv) }) + (tw.liveTrains ? ' · ' + t('admin.liveTrains', '{n} train ticket(s) {v} counted as IRCTC ticketing, not add-on GTV', { n: tw.liveTrains, v: OT.inr(tw.liveTrainValue) }) : '')) + '</span>' : '') +
       '<div class="split-even" style="margin-top:18px">' +
         K.pane(t('admin.ordersByCat', 'Orders by service line'), esc(t('admin.ordersByCatSub', 'Weekly add-on orders')), C.stacked(a.weeks, a.cats.map(function (c) { return { name: c.name, values: c.orders }; }), { label: 'Weekly orders by service line', totalLabels: false })) +
         K.pane(t('admin.attachTrend', 'Attach rate trend'), esc(t('admin.attachTrendSub', 'Pilot ramp toward the 8–12% base-case assumption')), C.line(a.weeks, [{ name: 'Attach rate', values: a.attach }], { area: true, fmt: function (v) { return v.toFixed(2) + '%'; }, fmtTick: tickPct, fmtLabel: function (v) { return v.toFixed(1) + '%'; }, label: 'Attach rate trend' })) +
@@ -221,11 +221,42 @@
       '</div>' + K.simLine();
   }
 
+  /** v1.1 (Builder A): long-weekend demand forecast — the data-monetisation view behind "For you". */
+  function lwForecast() {
+    var Dm = OT.data.demand; if (!Dm) return '';
+    var lws = Dm.longWeekends(null, 3); if (!lws.length) return '';
+    var homes = ['NDLS', 'CSMT', 'MAS', 'PUNE', 'CDG'];
+    var rows = [];
+    lws.forEach(function (lw) {
+      homes.forEach(function (h) {
+        var tr = Dm.trends(h, lw, null)[0];
+        if (tr) rows.push({ lw: lw, home: h, tr: tr });
+      });
+    });
+    var top = rows.filter(function (r) { return r.lw === lws[0]; }).sort(function (x, y) { return y.tr.bookings - x.tr.bookings; });
+    var sn = function (c) { return OT.data.travel.stationName(c, OT.i18n.lang()); };
+    var table = '<div class="table-wrap"><table class="table"><thead><tr><th>' + esc(t('admin.lw.weekend', 'Long weekend')) + '</th><th>' + esc(t('admin.lw.from', 'From')) + '</th><th>' + esc(t('admin.lw.route', 'Top route')) + '</th><th class="num">' + esc(t('admin.lw.bookings', 'Bookings')) + '</th><th class="num">' + esc(t('admin.lw.change', 'vs normal')) + '</th><th class="num">' + esc(t('admin.lw.fills', 'Fills early')) + '</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr><td>' + esc(r.lw.holiday.name) + ' <span class="xs muted">' + esc(OT.fmtDate(r.lw.start).replace(/ \d{4}$/, '') + ' – ' + OT.fmtDate(r.lw.end).replace(/ \d{4}$/, '') + ' · ' + r.lw.days + 'd') + '</span></td><td>' + esc(sn(r.home)) + '</td><td>' + esc(r.tr.label) + ' <span class="xs muted">' + esc(r.home + '→' + r.tr.to) + '</span></td>' +
+          '<td class="num">' + r.tr.bookings.toLocaleString('en-IN') + '</td><td class="num">+' + r.tr.change + '%</td><td class="num">' + r.tr.fillsEarly + ' d</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    var levers = '<ul class="small lw-levers">' +
+      '<li><strong>' + esc(t('admin.lw.l1', 'Partner Demand Radar')) + '</strong> · ' + esc(t('admin.lw.l1d', 'sell aggregated arrival forecasts to hotels/cabs in the destination (k ≥ 50, no personal data)')) + '</li>' +
+      '<li><strong>' + esc(t('admin.lw.l2', 'Long-weekend packages')) + '</strong> · ' + esc(t('admin.lw.l2d', 'train + verified stay + cab bundles shown to travellers who opted in')) + '</li>' +
+      '<li><strong>' + esc(t('admin.lw.l3', 'Capacity planning')) + '</strong> · ' + esc(t('admin.lw.l3d', 'flag routes that fill early for extra coaches or special trains')) + '</li>' +
+      '<li><strong>' + esc(t('admin.lw.l4', 'Bank offers')) + '</strong> · ' + esc(t('admin.lw.l4d', 'EMI / rewards on high-value trips, only with Account Aggregator-style consent')) + '</li></ul>';
+    return '<div data-tour="lw-forecast">' + K.sec(t('admin.lw.title', 'Long-weekend demand forecast (data monetisation)'),
+      esc(t('admin.lw.sub', 'Sample holiday calendar (verify with the official gazette) × simulated, aggregated route demand from home cities. Powers the traveller “For you” suggestions.')),
+      '<div class="split">' + K.pane(t('admin.lw.next', 'Next long weekend: {h}', { h: lws[0].holiday.name }), esc(t('admin.lw.nextSub', 'Top route per origin city, bookings for that weekend')),
+        C.hbar(top.map(function (r) { return { label: sn(r.home) + ' → ' + r.tr.label, value: r.tr.bookings, highlight: r.tr.change >= 150, tip: '+' + r.tr.change + '% vs a normal weekend' }; }), { compact: true, label: 'Long-weekend bookings by route' })) +
+        K.pane(t('admin.lw.levers', 'How IRCTC can monetise it (illustrative)'), '', levers) + '</div>' + table) + '</div>';
+  }
+
   function demand(body) {
     var a = A(), d = a.destinations;
     var byTotal = d.slice().sort(function (x, y) { return y.total - x.total; });
     var byFwd = d.slice().sort(function (x, y) { return y.fwd - x.fwd; });
-    body.innerHTML = K.sec('', esc(t('admin.demandSub', 'Rail arrivals on pilot routes (thousands per month) from first-party booking data — aggregated, no individual records.')),
+    body.innerHTML = lwForecast() + K.sec('', esc(t('admin.demandSub', 'Rail arrivals on pilot routes (thousands per month) from first-party booking data — aggregated, no individual records.')),
       '<div class="split">' +
         K.pane(t('admin.heat', 'Arrivals by destination and month'), esc(t('admin.heatSub', 'Thousands of passengers · darker = more')), C.heat(byTotal.map(function (x) { return x.city + ' (' + x.code + ')'; }), a.months, byTotal.map(function (x) { return x.m; }), { rowTotals: true, totalLabel: '6-mo', corner: t('admin.dest', 'Destination'), fmt: function (v) { return v + 'K'; }, cellFmt: function (v) { return String(v); }, label: 'Arrivals by destination and month' })) +
         K.pane(t('admin.fwd', 'Forward bookings, next 30 days'), esc(t('admin.fwdSub', '% change vs previous 30 days · spikes over 20% highlighted')), C.hbar(byFwd.map(function (x) { return { label: x.city, value: x.fwd, highlight: x.fwd >= 20, tip: x.city + ': +' + x.fwd + '% · ' + x.note }; }), { compact: true, fmt: function (v) { return '+' + v + '%'; }, label: 'Forward bookings growth' })) +

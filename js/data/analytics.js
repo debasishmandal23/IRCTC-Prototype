@@ -275,10 +275,16 @@
       if (!Array.isArray(list)) list = [];
       var ok = list.filter(function (b) { return b && typeof b === 'object'; });
       var confirmed = ok.filter(function (b) { return b.status !== 'cancelled' && b.status !== 'refunded'; });
-      var gtvLive = confirmed.reduce(function (a, b) { return a + (Number(b.amount) || 0); }, 0);
+      // v1.1: train tickets are IRCTC ticketing revenue, not OneTrip add-on GTV -> tracked separately
+      var addOns = confirmed.filter(function (b) { return b.type !== 'train'; });
+      var trains = confirmed.filter(function (b) { return b.type === 'train'; });
+      var sum = function (l) { return l.reduce(function (a, b) { return a + (Number(b.amount) || 0); }, 0); };
+      var gtvLive = sum(addOns);
       return {
         all: ok,
-        confirmed: confirmed,
+        confirmed: addOns,
+        trains: trains,
+        trainValue: sum(trains),
         gtv: gtvLive,
         p101: ok.filter(function (b) { return b.partnerId === 'P-101'; }),
         cancelled: ok.filter(function (b) { return b.status === 'cancelled' || b.status === 'refunded' || b.cancellation; })

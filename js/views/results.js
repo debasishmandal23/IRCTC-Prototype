@@ -185,7 +185,8 @@
   }
 
   /* ---------------- actions ---------------- */
-  function addItem(refId) {
+  function addItem(refId, opts) {
+    opts = opts || {};
     var run = OT.state.lastRun, x = D().get(refId);
     var j = OT.store.get('journey');
     if (!x || !j) return null;
@@ -205,7 +206,7 @@
     j.items.push(item);
     OT.store.set('journey', j);
     var r = OT.agents.readiness(j).score;
-    OT.toast(replaced ? t('res.replaced', '{a} replaced {b} · Trip Readiness {r}%', { a: x.name, b: replaced, r: r }) : t('res.addedToast', 'Added to My Journey · Trip Readiness {r}%', { r: r }), 'success');
+    if (!opts.quiet) OT.toast(replaced ? t('res.replaced', '{a} replaced {b} · Trip Readiness {r}%', { a: x.name, b: replaced, r: r }) : t('res.addedToast', 'Added to My Journey · Trip Readiness {r}%', { r: r }), 'success');
     refresh();
     return item;
   }
@@ -264,13 +265,31 @@
     if (sp) sp.addEventListener('click', function () { OT.lang.speak(OT.agents.summarize(OT.state.lastRun, L()), L()); });
   }
 
+  /** A long-weekend package booked from "For you": once the train is booked, add its hotel, cab and sight. */
+  function applyPackage(to) {
+    var pk = OT.state.applyPackage;
+    if (!pk || pk.to !== to) return;
+    OT.state.applyPackage = null;
+    var j = OT.store.get('journey');
+    if (j && pk.nights) OT.store.update('journey', function (x) { x.nights = pk.nights; return x; });
+    var added = [];
+    [pk.hotel, pk.cab, pk.sight].forEach(function (ref) {
+      if (!ref) return;
+      var jj = OT.store.get('journey');
+      if (jj && (jj.items || []).some(function (i) { return i.refId === ref && i.status !== 'cancelled'; })) return;
+      var it = addItem(ref, { quiet: true }); if (it) added.push(it.title);
+    });
+    if (added.length) { OT.toast(t('res.pkgAdded', 'Package added to My Journey: {list}', { list: added.join(', ') }), 'success'); refresh(); }
+  }
+
   function render(el, params) {
     root = el;
     var q = params.query || {};
     var j = OT.store.get('journey');
     var to = q.to || (j && j.scenario) || 'CDG';
-    if (!D().scenarios[to]) to = 'CDG';
-    if (!j || j.scenario !== to) { j = D().makeJourney(to, {}); OT.store.set('journey', j); }
+    if (!D().stations[to]) to = 'CDG';
+    if (D().ensureCity) D().ensureCity(to);
+    if (!j || !j.train || (j.scenario !== to && j.train.to !== to)) { j = D().scenarios[to] ? D().makeJourney(to, {}) : D().plannedJourney(to, {}); OT.store.set('journey', j); }
     var lang = L();
     var query = q.q || t('search.autoQuery', 'Hotel, cab, food and sightseeing near {city} station within {budget}', { city: D().stationName(to, lang), budget: OT.inr(j.budget) });
     var key = [query, to, j.budget, JSON.stringify(j.prefs)].join('|');
@@ -279,7 +298,8 @@
     el.innerHTML = '<div class="container page results-page">' +
       '<div class="page-head"><div><p class="ot-eyebrow">' + OT.icon('train', 14) + ' <bdi class="keep">' + tr.no + '</bdi> ' + OT.esc(tr.name) + ' · <bdi class="keep">' + tr.from + '</bdi> → <bdi class="keep">' + tr.to + '</bdi> · <bdi class="keep">' + OT.esc(OT.fmtDate(tr.date)) + '</bdi></p>' +
       '<h1>' + OT.esc(t('res.title', 'Verified options near {city}', { city: D().stationName(to, lang) })) + '</h1>' +
-      '<p>' + OT.esc(t('res.sub', 'Every price and timing comes from a provider source with a check time. Nothing is invented.')) + '</p></div>' +
+      '<p>' + OT.esc(t('res.sub', 'Every price and timing comes from a provider source with a check time. Nothing is invented.')) + '</p>' +
+      (tr.status === 'PLANNED' ? '<p class="note note-warn small">' + OT.icon('train', 14) + ' ' + OT.esc(t('res.planned', 'Suggested train, not booked yet.')) + ' <a href="#/' + OT.trains.path({ from: tr.from, to: tr.to, date: tr.date, pax: j.passengers }) + '">' + OT.esc(t('res.bookTrain', 'Book the train first')) + '</a></p>' : '') + '</div>' +
       '<div class="row-wrap"><a class="btn btn-ghost btn-sm" href="#/home?to=' + to + '">' + OT.icon('edit', 15) + OT.esc(t('res.edit', 'Edit search')) + '</a>' +
       '<button type="button" class="btn btn-ghost btn-sm" id="rerun">' + OT.icon('refresh', 15) + OT.esc(t('res.rerun', 'Run agents again')) + '</button></div></div>' +
       '<div class="res-grid">' +
@@ -296,6 +316,7 @@
       traceEl.innerHTML = traceHTML(cached, cached.steps, true);
       el.querySelector('#res-main').innerHTML = resultsHTML(cached);
       bindMain();
+      applyPackage(to);
       return;
     }
     var my = ++token;
@@ -304,7 +325,7 @@
     traceEl.innerHTML = traceHTML({}, [], false);
     OT.agents.run(query, {
       lang: lang,
-      intent: { to: to, budget: j.budget, prefs: j.prefs, nearStation: !!(j.prefs && j.prefs.nearStation), date: tr.date },
+      intent: { to: to, budget: j.budget, prefs: j.prefs, nearStation: !!(j.prefs && j.prefs.nearStation), date: tr.date }, train: j.train,
       onStep: function (s, steps) {
         if (my !== token || !root) return;
         traceEl.innerHTML = traceHTML({}, steps, false);
@@ -319,6 +340,7 @@
       el.querySelector('#res-main').innerHTML = resultsHTML(run);
       bindMain();
       var tray = el.querySelector('#res-tray'); if (tray) tray.innerHTML = trayHTML();
+      applyPackage(to);
     }).catch(function (e) {
       OT.state.running = false;
       console.error('[OT] agent run failed', e);

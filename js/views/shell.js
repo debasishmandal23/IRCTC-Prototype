@@ -6,7 +6,7 @@
   var OT = window.OT;
   var shell = OT.shell = {};
 
-  var SECTION = { home: 'home', results: 'home', journey: 'journey', checkout: 'journey', bookings: 'bookings', login: 'login', register: 'login' };
+  var SECTION = { trains: 'trains', home: 'home', results: 'home', journey: 'journey', checkout: 'journey', bookings: 'bookings', login: 'login', register: 'login' };
 
   function $(id) { return document.getElementById(id); }
   function setIcon(id, name, size) { var el = $(id); if (el) el.innerHTML = OT.icon(name, size || 20); }
@@ -37,17 +37,71 @@
     var u = OT.store.get('user');
     if (u && u.name) {
       var ini = u.name.split(/\s+/).map(function (w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase();
-      a.innerHTML = '<span class="avatar-ini" aria-hidden="true">' + OT.esc(ini) + '</span>';
+      a.innerHTML = '<span class="avatar-ini" aria-hidden="true">' + OT.esc(ini) + '</span><span class="hu-name">' + OT.esc(u.name.split(' ')[0]) + '</span>' + OT.icon('chevronDown', 14);
       a.setAttribute('aria-label', OT.t('hdr.account', 'Account: {name}', { name: u.name }));
       a.title = u.name + ' · ' + u.role;
       a.classList.add('signed-in');
     } else {
-      a.innerHTML = OT.icon('user', 20);
-      a.setAttribute('aria-label', OT.t('hdr.login', 'Login'));
-      a.title = OT.t('hdr.login', 'Login');
+      a.innerHTML = OT.icon('user', 18) + '<span class="hu-name">' + OT.esc(OT.t('hdr.signin', 'Sign in')) + '</span>';
+      a.setAttribute('aria-label', OT.t('hdr.signinMenu', 'Sign in · choose a demo persona'));
+      a.title = OT.t('hdr.signin', 'Sign in');
       a.classList.remove('signed-in');
     }
+    if (menuOpen) renderMenu();
   }
+
+  /* ---------- user menu: who is signed in, switch persona, sign out ---------- */
+  var menuOpen = false;
+  function renderMenu() {
+    var m = $('user-menu'); if (!m) return;
+    var u = OT.store.get('user'), P = OT.data.personas;
+    var t = OT.t;
+    var cur = u && u.name ? '<div class="um-cur"><span class="avatar-ini big">' + OT.esc(u.name.split(/\s+/).map(function (w) { return w.charAt(0); }).join('').slice(0, 2).toUpperCase()) + '</span><div><strong>' + OT.esc(u.name) + '</strong>' +
+      '<span class="xs muted">' + OT.esc(u.personaId && P && P.get(u.personaId) ? t(P.get(u.personaId).segKey, P.get(u.personaId).seg) : u.role) + '</span>' +
+      (u.homeCity ? '<span class="xs muted">' + OT.esc(t('um.home', 'Home city')) + ': ' + OT.esc(OT.data.travel.stationName(u.homeCity, OT.i18n.lang())) + ' <bdi class="keep">' + OT.esc(u.homeCity) + '</bdi></span>' : '') +
+      '<span class="xs badge b-sim">' + OT.esc(t('um.sim', 'Simulated sign-in')) + '</span></div></div>' : '<p class="small um-hint">' + OT.esc(t('um.hint', 'Pick a demo persona to sign in (no password):')) + '</p>';
+    var list = P ? P.list.map(function (p) {
+      var on = u && u.personaId === p.id;
+      return '<button type="button" class="um-p' + (on ? ' on' : '') + '" data-persona="' + p.id + '" role="menuitem">' + OT.icon(p.role === 'partner' ? 'store' : p.role === 'admin' ? 'bank' : 'user', 16) +
+        '<span><strong>' + OT.esc(p.name) + '</strong><span class="xs muted">' + OT.esc(t(p.segKey, p.seg)) + '</span></span>' + (on ? OT.icon('check', 14) : '') + '</button>';
+    }).join('') : '';
+    m.innerHTML = cur + '<p class="um-label xs">' + OT.esc(u && u.name ? t('um.switch', 'Switch persona') : t('um.personas', 'Demo personas')) + '</p><div class="um-list" role="menu">' + list + '</div>' +
+      '<div class="um-foot"><a href="#/login" class="small" data-um-close>' + OT.esc(t('um.all', 'All personas & email sign-in')) + '</a>' +
+      (u && u.name ? '<button type="button" class="btn btn-ghost btn-sm" data-um-out>' + OT.icon('logout', 14) + OT.esc(t('auth.logout', 'Sign out')) + '</button>' : '') + '</div>';
+  }
+  function setMenu(open) {
+    var m = $('user-menu'), b = $('hdr-user'); if (!m || !b) return;
+    menuOpen = open;
+    if (open) renderMenu();
+    m.hidden = !open; b.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  shell.userMenu = setMenu;
+  function bindMenu() {
+    var b = $('hdr-user'), m = $('user-menu'); if (!b || !m) return;
+    b.addEventListener('click', function (e) { e.stopPropagation(); setMenu(!menuOpen); });
+    m.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var p = e.target.closest('[data-persona]');
+      if (p) { setMenu(false); if (OT.auth && OT.auth.signInPersona) OT.auth.signInPersona(p.getAttribute('data-persona')); return; }
+      if (e.target.closest('[data-um-out]')) { setMenu(false); OT.store.set('user', undefined); OT.toast(OT.t('auth.loggedOut', 'Signed out.'), 'info'); OT.router.render(); return; }
+      if (e.target.closest('[data-um-close]')) setMenu(false);
+    });
+    document.addEventListener('click', function (e) { if (menuOpen && e.target.isConnected && !e.target.closest('.user-wrap')) setMenu(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && menuOpen) { setMenu(false); b.focus(); } });
+  }
+
+  /** Small dismissible offer bar, e.g. "Switched to हिन्दी for Sunita · Keep English". */
+  shell.offer = function (text, actionLabel, fn) {
+    var el = document.getElementById('ot-offer');
+    if (!el) { el = OT.h('<div class="ot-offer" id="ot-offer" role="status"></div>'); document.body.appendChild(el); }
+    el.innerHTML = '<span class="small">' + OT.esc(text) + '</span>' + (actionLabel ? '<button type="button" class="btn btn-ghost btn-sm" data-offer>' + OT.esc(actionLabel) + '</button>' : '') +
+      '<button type="button" class="icon-btn" data-offer-x aria-label="Close">' + OT.icon('x', 14) + '</button>';
+    el.classList.add('show');
+    clearTimeout(shell._offerT);
+    shell._offerT = setTimeout(function () { el.classList.remove('show'); }, 10000);
+    var a = el.querySelector('[data-offer]'); if (a) a.addEventListener('click', function () { el.classList.remove('show'); if (fn) fn(); });
+    el.querySelector('[data-offer-x]').addEventListener('click', function () { el.classList.remove('show'); });
+  };
 
   function closeMenu() {
     var nav = $('main-nav'), t = $('nav-toggle');
@@ -114,6 +168,7 @@
       if (nav && nav.classList.contains('open') && !e.target.closest('#main-nav') && !e.target.closest('#nav-toggle')) closeMenu();
     });
 
+    bindMenu();
     var mic = $('hdr-mic'); if (mic) mic.addEventListener('click', shell.voice);
     var asst = $('hdr-assistant'); if (asst) asst.addEventListener('click', function () { if (OT.assistant) OT.assistant.toggle(); });
     var demo = $('hdr-demo'); if (demo) demo.addEventListener('click', function () { if (OT.tour) OT.tour.start(); });

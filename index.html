@@ -31,6 +31,7 @@
       </a>
       <nav class="main-nav" id="main-nav" aria-label="Main">
         <a href="#/home" data-nav="home" data-i18n="nav.plan">Plan trip</a>
+        <a href="#/trains" data-nav="trains" data-i18n="nav.trains">Trains</a>
         <a href="#/journey" data-nav="journey" data-i18n="nav.journey">My Journey</a>
         <a href="#/bookings" data-nav="bookings" data-i18n="nav.bookings">Bookings &amp; refunds</a>
         <a href="#/partner" data-nav="partner" data-i18n="nav.partner">Partner</a>
@@ -47,7 +48,7 @@
         <button class="icon-btn" id="hdr-assistant" aria-label="Open AI assistant" title="AI assistant"></button>
         <button class="btn btn-accent btn-sm hide-sm" id="hdr-demo" data-i18n="nav.demo">Start demo</button>
         <button class="icon-btn" id="hdr-settings" aria-label="Settings" title="Settings &amp; AI key"></button>
-        <a class="icon-btn" id="hdr-user" href="#/login" aria-label="Login" title="Login"></a>
+        <div class="user-wrap"><button type="button" class="hdr-user" id="hdr-user" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu"></button><div class="user-menu" id="user-menu" hidden></div></div>
       </div>
     </div>
   </header>
@@ -75,6 +76,9 @@
   <script src="js/core/router.js"></script>
 
   <script src="js/data/travel.js"></script>
+  <script src="js/data/rail.js"></script>
+  <script src="js/data/cities.js"></script>
+  <script src="js/data/personas.js"></script>
   <script src="js/data/analytics.js"></script>
   <script src="js/data/survey.js"></script>
 
@@ -86,8 +90,10 @@
   <script src="js/agents/orchestrator.js"></script>
 
   <script src="js/views/shell.js"></script>
+  <script src="js/views/foryou.js"></script>
   <script src="js/views/home.js"></script>
   <script src="js/views/results.js"></script>
+  <script src="js/views/trains.js"></script>
   <script src="js/views/journey.js"></script>
   <script src="js/views/checkout.js"></script>
   <script src="js/views/bookings.js"></script>

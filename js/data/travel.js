@@ -398,6 +398,17 @@
     policies: policies,
     all: all,
     get: function (id) { return byId[id]; },
+    /** Register generated catalogue items (any-city listings, v1.1). */
+    addItems: function (items) {
+      items.forEach(function (x) {
+        if (byId[x.id]) return;
+        x.simulated = true;
+        x.source.checkedAt = x.source.checkedAt || ago(x.source.checkedMins);
+        x.providerSource.checkedAt = x.providerSource.checkedAt || ago(x.providerSource.checkedMins);
+        all.push(x); byId[x.id] = x;
+        (x.type === 'hotel' ? hotels : x.type === 'cab' ? cabs : x.type === 'food' ? food : sights).push(x);
+      });
+    },
     byCity: function (city, type) {
       return all.filter(function (x) { return x.city === city && (!type || x.type === type); });
     },

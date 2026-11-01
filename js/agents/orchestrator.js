@@ -110,7 +110,8 @@
       }).catch(function () { return 'fallback'; }) : Promise.resolve('rules');
       return p.then(function (engine) {
         if (!run.intent.to) run.intent.to = (opts.intent && opts.intent.to) || 'CDG';
-        if (!run.intent.budget) run.intent.budget = D.scenarios[run.intent.to] ? D.scenarios[run.intent.to].budget : 3000;
+        if (!run.intent.budget) run.intent.budget = (opts.intent && opts.intent.budget) || (D.scenarios[run.intent.to] ? D.scenarios[run.intent.to].budget : 3000);
+        if (D.ensureCity) D.ensureCity(run.intent.to);
         if (!run.intent.types.length) run.intent.types = ['hotel'];
         run.intent.nearStation = run.intent.nearStation || !!(run.intent.prefs && run.intent.prefs.nearStation);
         var call = { tool: 'plan_trip', to: run.intent.to, max_price: run.intent.budget, focus: run.intent.types, near_station: run.intent.nearStation, veg: !!run.intent.prefs.veg };
@@ -175,7 +176,8 @@
     }).then(function () {
       /* 8. Itinerary draft */
       var s = begin('itinerary', L('tr.itin', 'Draft the chronological plan'));
-      var tr = D.trains[(D.scenarios[run.intent.to] || D.scenarios.CDG).trainNo];
+      var tr = opts.train && opts.train.to === run.intent.to ? opts.train : D.trains[(D.scenarios[run.intent.to] || D.scenarios.CDG).trainNo];
+      if (!tr || tr.to !== run.intent.to) tr = { no: '—', to: run.intent.to, arr: '12:00' };
       var top = run.rec.byType.hotel[0];
       return wait(450).then(function () {
         var lines = [L('tr.itinTrain', 'Train {no} arrives {to} at {arr} (sample timing)', { no: tr.no, to: tr.to, arr: tr.arr })];

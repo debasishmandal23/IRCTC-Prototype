@@ -27,23 +27,36 @@
 
   function cardHTML(b) {
     var x = D().get(b.refId) || {}, rf = OT.agents.refundFor(b);
-    var st = b.status;
-    return '<article class="bkg card-flat" data-bk="' + b.ref + '">' +
+    var st = b.status, pol = b.type === 'train' ? { rail: true } : x.policy, tk = b.ticket;
+    return '<article class="bkg card-flat' + (b.type === 'train' ? ' bkg-train' : '') + '" data-bk="' + b.ref + '">' +
       '<div class="bk-top"><span class="offer-ic">' + OT.icon(x.service ? 'lock' : b.type, 20) + '</span>' +
       '<div class="bk-title"><strong>' + OT.esc(b.title) + '</strong><span class="xs muted">' + OT.esc(b.provider || '') + ' · ' + keep(b.ref) + '</span></div>' +
-      '<div class="bk-amt">' + keep(OT.inr(b.amount)) + OT.badge(st) + '</div></div>' +
+      '<div class="bk-amt">' + keep(OT.inr(b.amount)) + OT.badge(st) + (tk && st === 'confirmed' && tk.status !== 'CNF' ? OT.badge('pending', tk.passengers[0].status + ' · ' + t('trn.chance', '{p}% chance', { p: tk.chance })) : '') + '</div></div>' +
+      (tk ? '<p class="small bk-tk">' + OT.icon('train', 14) + ' PNR ' + keep(tk.pnr) + ' · ' + keep(tk.from) + ' ' + keep(tk.dep) + ' → ' + keep(tk.to) + ' ' + keep(tk.arr) + ' · ' + keep(tk.cls) + ' · ' +
+        OT.esc(t('ps.partyN', '{n} traveller(s)', { n: tk.passengers.length })) + ' · <a href="#/trains/ticket?pnr=' + tk.pnr + '">' + OT.esc(t('bk.eticket', 'View e-ticket')) + '</a></p>' : '') +
       '<dl class="bk-meta xs">' +
       '<div><dt>' + OT.esc(t('bk.when', 'Service date')) + '</dt><dd>' + (b.when ? keep(OT.fmtDate(b.when)) + ' ' + keep(b.when.slice(11, 16)) : '—') + '</dd></div>' +
       '<div><dt>' + OT.esc(t('bk.paid', 'Paid')) + '</dt><dd>' + OT.esc(OT.stamp(new Date(b.paidAt))) + '</dd></div>' +
       '<div><dt>' + OT.esc(t('bk.method', 'Method')) + '</dt><dd>' + OT.esc(b.method) + '</dd></div>' +
       '<div><dt>' + OT.esc(t('bk.txn', 'Transaction')) + '</dt><dd>' + keep(b.txn || '—') + '</dd></div></dl>' +
-      '<p class="policy small">' + OT.icon('refund', 14) + ' <span>' + OT.lang.highlight(OT.agents.policyText(x.policy)) + '</span></p>' +
+      '<p class="policy small">' + OT.icon('refund', 14) + ' <span>' + OT.lang.highlight(OT.agents.policyText(pol)) + '</span></p>' +
       (b.cancellation ? trackerHTML(b) : '') +
       '<div class="offer-actions">' +
       (st === 'confirmed' ? '<button type="button" class="btn btn-ghost btn-sm danger-ghost" data-cancel="' + b.ref + '">' + OT.icon('xCircle', 15) + OT.esc(t('bk.cancel', 'Cancel')) +
         (rf.amount != null ? ' · ' + OT.esc(t('bk.refundEst', 'refund {a}', { a: OT.inr(rf.amount) })) : '') + '</button>' : '') +
       '<button type="button" class="btn btn-link small" data-ticket="' + b.ref + '">' + OT.icon('headset', 14) + ' ' + OT.esc(t('bk.help', 'Raise support ticket')) + '</button>' +
       '</div></article>';
+  }
+
+  /** Persona's simulated past trips (not real bookings; not counted in partner/admin data). */
+  function historyHTML() {
+    var u = OT.store.get('user'), p = u && u.personaId && OT.data.personas && OT.data.personas.get(u.personaId);
+    if (!p || !p.history || !p.history.length) return '';
+    return '<div class="card tickets history"><div class="card-head"><h2 class="h3">' + OT.icon('clock', 18) + ' ' + OT.esc(t('bk.history', 'Past trips ({name})', { name: p.short })) + '</h2>' + OT.simTag(t('bk.histTag', 'SIMULATED HISTORY')) + '</div><ul class="tk-list">' +
+      p.history.map(function (h) {
+        return '<li><span><bdi class="keep">' + h[0] + '</bdi> → <bdi class="keep">' + h[1] + '</bdi></span><span class="small">' + OT.esc(D().stationName(h[0], OT.i18n.lang())) + ' → ' + OT.esc(D().stationName(h[1], OT.i18n.lang())) + ' · <bdi class="keep">' + h[4] + '</bdi></span>' +
+          '<span class="xs muted"><bdi class="keep">' + OT.esc(OT.fmtDate(h[2])) + '</bdi> · <bdi class="keep">' + OT.esc(OT.inr(h[5])) + '</bdi></span>' + OT.badge('confirmed', t('bk.travelled', 'Travelled')) + '</li>';
+      }).join('') + '</ul></div>';
   }
 
   function ticketsHTML() {
@@ -66,7 +79,7 @@
     el.innerHTML = '<div class="container page bookings-page">' +
       '<div class="page-head"><div><h1>' + OT.esc(t('bk.title', 'Bookings & refunds')) + '</h1><p>' + OT.esc(t('bk.sub', 'Track status, cancel under each provider\'s policy, and follow your refund to the bank.')) + '</p></div>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-ticket="">' + OT.icon('headset', 15) + OT.esc(t('bk.help', 'Raise support ticket')) + '</button></div>' +
-      (j ? '<div class="co-ticket card-flat small bk-train">' + OT.icon('train', 18) + '<div><strong>' + OT.esc(t('co.ticket', 'Train ticket')) + ' ' + keep(j.train.no) + ' · PNR ' + keep(j.pnr) + '</strong>' +
+      (j && j.pnr && !all.some(function (b) { return b.type === 'train' && b.pnr === j.pnr; }) ? '<div class="co-ticket card-flat small bk-train">' + OT.icon('train', 18) + '<div><strong>' + OT.esc(t('co.ticket', 'Train ticket')) + ' ' + keep(j.train.no) + ' · PNR ' + keep(j.pnr) + '</strong>' +
         '<span class="xs muted">' + OT.esc(t('bk.trainNote', 'Managed on IRCTC under railway rules. Cancel or refund the ticket on IRCTC.')) + '</span></div>' + OT.badge('confirmed', t('status.cnf', 'CNF')) + '</div>' : '') +
       '<div class="tabs" role="tablist">' + tabs.map(function (tb) {
         var n = all.filter(function (b) { return tb[0] === 'all' || (tb[0] === 'active' ? b.status === 'confirmed' : b.status !== 'confirmed'); }).length;
@@ -75,7 +88,7 @@
       (list.length ? '<div class="bk-list">' + list.map(cardHTML).join('') + '</div>'
         : '<div class="card empty-state">' + OT.icon('layers', 34) + '<p class="muted">' + OT.esc(all.length ? t('bk.noneFilter', 'Nothing in this view.') : t('bk.none', 'No OneTrip bookings yet. Add services to your journey and pay (simulated) to see them here.')) + '</p>' +
           (all.length ? '' : '<a class="btn btn-primary" href="#/journey">' + OT.esc(t('nav.journey', 'My Journey')) + '</a>') + '</div>') +
-      ticketsHTML() + '</div>';
+      ticketsHTML() + historyHTML() + '</div>';
 
     OT.$$('[data-f]', el).forEach(function (b) { b.addEventListener('click', function () { filter = b.getAttribute('data-f'); render(el); }); });
     OT.$$('[data-cancel]', el).forEach(function (b) { b.addEventListener('click', function () { cancel(b.getAttribute('data-cancel')); }); });
@@ -107,15 +120,16 @@
     var b = (OT.store.get('bookings') || []).filter(function (x) { return x.ref === ref; })[0];
     if (!b) return Promise.resolve(false);
     var x = D().get(b.refId) || {}, rf = OT.agents.refundFor(b);
+    var pol = b.type === 'train' ? { rail: true } : x.policy;
     var amt = rf.amount == null ? null : rf.amount;
     var lines = [
-      OT.esc(b.title) + ' · ' + keep(b.ref),
-      OT.esc(t('bk.cPolicy', 'Policy')) + ': ' + OT.lang.highlight(OT.agents.policyText(x.policy)),
+      OT.esc(b.title) + ' · ' + keep(b.ref) + (b.pnr ? ' · PNR ' + keep(b.pnr) : ''),
+      OT.esc(t('bk.cPolicy', 'Policy')) + ': ' + OT.lang.highlight(OT.agents.policyText(pol)) + (b.type === 'train' ? '<br>' + OT.esc(t('rail.charge', 'Cancellation charge')) + ': ' + keep(OT.inr(rf.charge || 0)) + ' · ' + OT.esc(t(rf.policy.rule, rf.policy.rule)) : ''),
       OT.esc(t('bk.cStart', 'Service starts')) + ': ' + (b.when ? keep(OT.fmtDate(b.when)) + ' ' + keep(b.when.slice(11, 16)) : '—') + ' · ' + OT.esc(t('bk.cLeft', '{h} h from now', { h: Math.max(0, Math.round(rf.hoursLeft)) })),
       amt == null ? OT.esc(t('bk.cUnknown', 'Refund amount unavailable: provider policy missing. A human agent will review.')) :
         OT.esc(t('bk.cRefund', 'Refund')) + ': <strong>' + keep(OT.inr(amt)) + '</strong> (' + rf.pct + '% ' + OT.esc(t('bk.cOf', 'of')) + ' ' + keep(OT.inr(b.amount)) + ') → ' + OT.esc(b.method)
     ];
-    var orig = OT.i18n.lang() !== 'en' ? '<details class="xs"><summary>' + OT.esc(t('tb.showOrig', 'Show original')) + ' (English)</summary>' + OT.lang.highlight(OT.agents.policyText(x.policy, 'en')) + '</details>' : '';
+    var orig = OT.i18n.lang() !== 'en' ? '<details class="xs"><summary>' + OT.esc(t('tb.showOrig', 'Show original')) + ' (English)</summary>' + OT.lang.highlight(OT.agents.policyText(pol, 'en')) + '</details>' : '';
     return OT.confirmAction({
       title: t('bk.cTitle', 'Cancel this booking?'),
       lines: lines, danger: true,
@@ -127,7 +141,11 @@
       var c = { requestedAt: now, refundAmount: amt || 0, pct: rf.pct || 0, status: 'processing', eta: ymdPlus(now, 7), stage: 0, times: [now], reviewByHuman: amt == null };
       update(ref, function (bb) { bb.status = 'cancelled'; bb.cancellation = c; bb.cancelledAt = now; });
       OT.store.update('cancellations', function (l) { return (l || []).concat([{ ref: ref, partnerId: b.partnerId, title: b.title, amount: b.amount, refundAmount: c.refundAmount, requestedAt: now, status: 'processing', stage: 0, lang: OT.i18n.lang() }]); });
-      OT.store.update('journey', function (j) { if (j && j.items) j.items.forEach(function (i) { if (i.id === b.itemId) i.status = 'cancelled'; }); return j; });
+      OT.store.update('journey', function (j) {
+        if (j && j.items) j.items.forEach(function (i) { if (i.id === b.itemId) i.status = 'cancelled'; });
+        if (j && b.type === 'train' && j.pnr && j.pnr === b.pnr) j.train.status = 'CANCELLED';
+        return j;
+      });
       if (amt == null) OT.agents.createTicket({ category: 'refund', subject: 'Refund review: policy missing', bookingRef: ref, source: 'bookings' });
       OT.toast(t('bk.cancelled', 'Cancelled. Refund {a} requested.', { a: OT.inr(c.refundAmount) }), 'success');
       filter = 'all';

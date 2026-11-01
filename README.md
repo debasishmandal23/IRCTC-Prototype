@@ -1,11 +1,11 @@
-# IRCTC OneTrip — AI-powered, multilingual integrated travel platform (prototype v1)
+# IRCTC OneTrip — AI-powered, multilingual integrated travel platform (prototype v1.1)
 
 > **One journey. One dashboard. In your language.**
 > A working prototype for **Case 13 — "How should IRCTC expand its digital travel platform?"**
 > (Business in the Digital Age, SPJIMR PGDM 2026–28).
 
-OneTrip sits **after** the IRCTC ticket is booked. It plans the rest of the trip around the train:
-hotel, cab, food and sightseeing. AI agents research and *independently verify* every option. The
+OneTrip starts with the train: pick two stations and a date, see the trains, book one (simulated), and the
+PNR becomes your journey. Then it plans the rest of the trip around the train: hotel, cab, food and sightseeing. AI agents research and *independently verify* every option. The
 traveller can speak or type in 11 Indian languages, and every arrangement is managed from one
 **My Journey** dashboard with a **Trip Readiness** score.
 
@@ -41,19 +41,26 @@ There is no build step and no dependencies: plain HTML, CSS and JavaScript (clas
 
 ## 🎬 3-minute jury demo
 
-Click **Start demo** in the header. The guided tour drives the app by itself, so you only press **Next**:
+Click **Start demo** in the header. The 20-step guided tour drives the app by itself, so you only press **Next**:
 
-1. Switch the site to **Hindi** → play the sample voice query
-   *"मुझे चंडीगढ़ रेलवे स्टेशन के पास तीन हजार रुपये तक का होटल चाहिए।"*
-2. Watch the **Agent Trace**: Orchestrator → Multilingual → Research → **Verification** → Recommendation → Itinerary.
-   Verification catches a changed price, stale data, a missing rating and a sold-out hotel.
-3. Add the verified hotel (*Hotel Shivalik View*, partner P-101) and a cab → the **railway route-line timeline** builds itself and
-   flags the conflict between the **11:05 arrival** and the **14:00 check-in**. Resolve it → Trip Readiness rises.
-4. Checkout → **human-in-the-loop confirmation**. PNR, train number, prices and dates stay untranslated → simulated payment → booking refs.
-5. Ask the assistant a refund question in Hindi → **🔊 listen** to the answer → switch language mid-chat → escalate to a human.
-6. **Partner dashboard** → the booking you just made appears as *"New via OneTrip"*.
-7. **Admin & Bank dashboard** → GTV includes it; language analytics; financial products; platform flywheel.
-8. **Business case** → survey evidence (N = 52), the 5 case questions, revenue model calculator, course frameworks.
+1. **Sign in as a persona** (`#/login`): Sunita Sharma, a family traveller from New Delhi who prefers Hindi. The language,
+   home city, party of 3 and preferences load automatically.
+2. **For you, Sunita**: the long-weekend detector finds **Christmas (Fri 25 Dec 2026) → a 3-day weekend**. It shows where
+   travellers from Delhi are going (aggregated, anonymised, simulated) and a train + hotel + cab + sight **package**.
+3. Speak (or play the sample) *"क्रिसमस पर दिल्ली से चंडीगढ़ की ट्रेन बुक करो"* → the app replies **"I heard: …"** with chips
+   (Intent, From, To, Date) and opens the **train results** for that date.
+4. Book **12011 Kalka Shatabdi, CC** → passengers prefilled → fare summary → **human-in-the-loop confirm** → simulated payment →
+   **PNR + e-ticket** (CNF / RAC / WL with a chance of confirmation).
+5. **"Now plan your stay in Chandigarh"** → Agent Trace: Orchestrator → Multilingual → Research → **Verification** →
+   Recommendation → Itinerary. The package hotel (*Hotel Shivalik View*, partner P-101) and cab are added.
+6. **My Journey**: the ticket is the first item on the route-line timeline. The conflict between the **11:05 arrival** and the
+   **14:00 check-in** is flagged; resolve it → Trip Readiness rises.
+7. Checkout → confirm → booking refs. Assistant refund question in Hindi → 🔊 listen → escalate.
+8. **Partner dashboard** shows the new booking; **Admin & Bank** shows the **long-weekend demand forecast**
+   (the data-monetisation use case) and GTV; **Business case** closes the story.
+
+Try typing any route in the home box, e.g. **"book from Chandigarh to Mumbai train"**, "चंडीगढ़ से मुंबई ट्रेन कल",
+"hotel in Hyderabad", "status of my train", "refund kab milega".
 
 Pre-demo checklist: see [`docs/VERIFICATION.md`](docs/VERIFICATION.md#jury-demo-checklist).
 
@@ -63,19 +70,27 @@ Pre-demo checklist: see [`docs/VERIFICATION.md`](docs/VERIFICATION.md#jury-demo-
 
 | Interface | Route | Highlights |
 |---|---|---|
-| **Traveller** | `#/home` | Journey search (type or speak), PNR import (simulated), sample voice queries in Hindi, Tamil and Bengali, station name-board hero |
-| | `#/results` | Live Agent Trace, verified hotels, cabs, food and sightseeing, source + checked time + verification badge, price comparison, read aloud |
+| **Traveller** | `#/home` | **Step 1 · Find trains** (from/to station pickers, date, class, passengers), "type or speak a command" box with **I heard** chips, PNR import as a second path, sample voice queries, **For you** suggestions |
+| | `#/trains?from=&to=&date=` | Simulated timetable for any of ~40 stations (typeahead in English and Indian scripts), classes, fares, availability (AVAILABLE / RAC / WL / REGRET), filters and sort, verification badge + source + checked time per train |
+| | `#/trains/book`, `#/trains/ticket?pnr=` | Passengers (persona prefilled), fare breakup, confirm, simulated payment, PNR e-ticket, "plan your stay" CTA |
+| | `#/login` | **Demo persona cards**: 4 travellers (Sunita · Delhi · Hindi, Ramesh · Chennai · Tamil pilgrim, Arjun · Pune · Marathi student, Neha · Mumbai · business), Partner P-101, Admin/Bank. The header user menu switches persona or signs out |
+| | `#/results?to=` | Any destination station (generated, deterministic listings for cities outside the three scripted scenarios). Live Agent Trace, verified hotels, cabs, food and sightseeing, source + checked time + verification badge, price comparison, read aloud |
 | | `#/journey` | **My Journey**: Trip Readiness ring with explanation, chronological route-line timeline, conflict flags and fixes |
 | | `#/checkout` | Booking and payment summary, simulated UPI/card, confirm step, confirmation |
-| | `#/bookings` | Status tracking, policy-based cancellation, refund tracker, support tickets |
+| | `#/bookings` | Train ticket with railway-style cancellation charge and refund, persona trip history, status tracking, policy-based cancellation, refund tracker, support tickets |
 | | Assistant drawer | Multilingual chat, 🎤 mic, 🔊 speaker, language switch mid-chat, "show original", human escalation |
 | **Tourism Partner** | `#/partner` | Login/registration, listings CRUD, price and availability calendar, enquiries with Partner Agent draft replies, bookings, revenue, conversion and cancellations, feedback |
-| **Admin & Bank** | `#/admin` | Users and providers, bookings and GTV, complaints, refunds and SLA, partner performance, destination demand, financial products (escrow, T+1 settlement), language and support analytics, platform health |
+| **Admin & Bank** | `#/admin` | Users and providers, bookings and GTV, complaints, refunds and SLA, partner performance, destination demand, **long-weekend demand forecast**, financial products (escrow, T+1 settlement), language and support analytics, platform health |
 | **Business case** | `#/insights` | Problem, survey evidence, personas, Case Q1–Q5, revenue model, social-mandate guardrails, UTAUT, VRIO, Sense–Seize–Transform, roadmap |
 | **How it works** | `#/about` | Agent architecture, BHASHINI pipeline, data and verification rules, what is simulated vs real, privacy (DPDP) |
 | **Settings** | `#/settings` | Optional Gemini key, AI mode, voice support check, reset demo data |
 
-Demo logins are prefilled on each login screen (traveller, partner P-101, admin/bank).
+Demo logins are prefilled on each login screen (traveller, partner P-101, admin/bank), and `#/login` offers one-click persona sign-in.
+
+**For you, <name>** (home and My Journey): upcoming long weekends from a sample holiday calendar (weekdays computed with
+`Date`; Tue/Thu holidays become 4-day weekends with one day of leave), "Trending from <home city>" with aggregated,
+anonymised counts, % change and "fills N days early", and a priced package per trend. "Why am I seeing this?" explains the
+data used; a DPDP consent switch hides the section. All demand data is simulated.
 
 ### AI agents (`js/agents/`)
 | Agent | Role in the prototype |
@@ -126,14 +141,14 @@ Gemini is used only for language. Prices and timings always come from the verifi
 index.html              app shell (open this)
 css/                    base.css (design tokens) · traveller.css · dashboards.css
 js/core/                util · store (localStorage) · i18n (11 languages) · ui · router (hash routes)
-js/data/                travel.js (simulated catalogue) · analytics.js (simulated KPIs) · survey.js (real survey stats, N=52)
+js/data/                travel.js (simulated catalogue) · rail.js (stations, timetable, fares, PNR) · cities.js (any-city listings) · personas.js (personas, holidays, demand) · analytics.js (simulated KPIs) · survey.js (real survey stats, N=52)
 js/services/            language.js (BHASHINI-ready layer: ASR/NMT/TTS/transliteration, simulated) · gemini.js (optional)
 js/agents/              agents.js · orchestrator.js
 js/lib/charts.js        dependency-free SVG charts
 js/views/               one file per screen
 js/tour.js              guided jury demo
 docs/                   ARCHITECTURE.md · VERIFICATION.md · research/ (requirements, business case, course frameworks, survey stats)
-tests/                  automated end-to-end tests (Playwright)
+tests/                  automated end-to-end tests (Playwright): `python3 tests/e2e.py` runs file:// and http at 1440 and 375 px
 ```
 
 ## 🔁 Reset

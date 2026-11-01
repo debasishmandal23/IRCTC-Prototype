@@ -54,7 +54,8 @@
       '<div class="card co-items" data-tour="co-items"><div class="card-head"><h2 class="h3">' + OT.esc(t('co.summary', 'Booking summary')) + '</h2>' + OT.simTag() + '</div>' +
       '<div class="co-ticket small">' + OT.icon('train', 18) + '<div><strong>' + OT.esc(t('co.ticket', 'Train ticket')) + ' ' + keep(j.train.no) + ' · PNR ' + keep(j.pnr) + '</strong>' +
       '<span class="xs muted">' + keep(j.train.from) + ' ' + keep(j.train.dep) + ' → ' + keep(j.train.to) + ' ' + keep(j.train.arr) + ' · ' + keep(OT.fmtDate(j.train.date)) + '</span></div>' +
-      '<div class="co-amt"><span>' + keep(OT.inr(j.train.fare)) + '</span>' + OT.badge('confirmed', t('co.paidIrctc', 'Paid on IRCTC')) + '<span class="xs muted">' + OT.esc(t('co.notCharged', 'Not charged again')) + '</span></div></div>' +
+      (j.train.status === 'PLANNED' ? '<div class="co-amt">' + OT.badge('pending', t('trip.notBooked', 'Not booked yet')) + '<a class="xs" href="#/' + OT.trains.path({ from: j.train.from, to: j.train.to, date: j.train.date, pax: j.passengers }) + '">' + OT.esc(t('trip.bookNow', 'Book this train')) + '</a></div></div>' :
+      '<div class="co-amt"><span>' + keep(OT.inr(j.train.fare)) + '</span>' + OT.badge('confirmed', t('co.paidIrctc', 'Paid on IRCTC')) + '<span class="xs muted">' + OT.esc(t('co.notCharged', 'Not charged again')) + '</span></div></div>') +
       '<ul class="co-lines">' + rows.map(function (r) { return lineHTML(r, j); }).join('') + '</ul>' +
       '<div class="co-totals small">' +
       '<div><span>' + OT.esc(t('co.subtotal', 'OneTrip services')) + '</span>' + keep(OT.inr(total)) + '</div>' +

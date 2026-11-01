@@ -32,60 +32,97 @@
   function go(path, name) { OT.go(path); return waitFor(function () { return route() === (name || path.split('?')[0].split('/')[0]); }, 4000); }
   function view(n) { return OT.views[n] || {}; }
 
+  function xmasIndex() {
+    var l = OT.data.demand.longWeekends(null, 3), i;
+    for (i = 0; i < l.length; i++) if (l[i].holiday.name === 'Christmas') return i;
+    return 0;
+  }
+  var VOICE_HI = 'क्रिसमस पर दिल्ली से चंडीगढ़ की ट्रेन बुक करो';
+  function clickPrimaryInModal() { var b = document.querySelector('.modal-backdrop .modal-foot .btn-primary'); if (b) b.click(); }
+
   var steps = [
-    { title: 'Welcome to IRCTC OneTrip', text: 'A rail-first trip planner that complements IRCTC ticketing. Everything is simulated sample data. This tour drives the app for you: just press Next.',
+    { title: 'Welcome to IRCTC OneTrip', text: 'A rail-first trip platform that complements IRCTC ticketing: find and book the train, then plan everything after it, in your language. Everything is simulated sample data. This tour drives the app for you: just press Next.',
       target: '.brand', enter: function () { return go('home'); } },
-    { title: 'Pick your language', text: 'The header selector offers 11 Indian languages in their own scripts. We switch to Hindi: the whole interface follows, and the destination board cycles through scripts.',
-      target: '.lang-select', enter: function () { OT.i18n.setLang('hi'); return OT.sleep(300); } },
-    { title: 'Speak the query (sample voice)', text: 'Real mics vary by browser, so we play the sample Hindi voice query as simulated ASR types it out. The live parse shows what was understood: Chandigarh, ₹3,000, near the station.',
-      target: '[data-tour="voice"]', enter: function () { return go('home').then(function () { return view('home').sample ? view('home').sample('hi') : null; }); } },
-    { title: 'Agent Trace: orchestrator → specialists', text: 'The Orchestrator decomposes the task and assigns Multilingual, Research, Verification, Recommendation and Itinerary agents. Each step shows tool calls, sources and timings.',
-      target: '[data-tour="trace"]', enter: function () {
-        OT.state.lastRun = null;
-        var p = view('home').submit ? view('home').submit() : Promise.resolve();
-        return p.then(function () { return waitFor(function () { return route() === 'results' && document.querySelector('.tr-step'); }, 5000); });
+    { title: 'Demo personas: one-click sign-in', text: 'Four traveller personas from our survey segments (family, pilgrim, student, business) plus a tourism partner and an admin/bank analyst. Each has a home city, language, preferences and past trips. You can also switch persona from the header.',
+      target: '[data-tour="personas"]', enter: function () { return go('login'); } },
+    { title: 'Signed in as Sunita, in Hindi', text: 'Sunita’s profile switches the UI to Hindi and loads “For you”: a long-weekend detector on a sample holiday calendar. Christmas falls on a Friday, so it is a 3-day weekend; Guru Nanak Jayanti on a Tuesday becomes 4 days with one leave day.',
+      target: '[data-tour="for-you"]', enter: function () {
+        if (OT.auth && OT.auth.signInPersona) OT.auth.signInPersona('sunita', { quiet: true });
+        OT.state.fyLw = xmasIndex();
+        return waitFor(function () { return route() === 'home' && document.querySelector('[data-tour="for-you"]'); }, 4000).then(function () {
+          var slot = document.querySelector('#for-you-slot'); if (slot && OT.forYou) OT.forYou.render(slot, { place: 'home' });
+        });
       } },
-    { title: 'Verification catches problems', text: 'Every record is re-checked at the provider: a changed price is flagged “Needs confirmation”, stale data asks for a re-check, a sold-out hotel is hidden. Hotel Shivalik View (partner P-101) is the top verified pick under ₹3,000.',
-      target: '[data-ref="H-CDG-01"]', enter: function () {
-        return waitFor(function () { return OT.state.lastRun && OT.state.lastRun.done && document.querySelector('[data-ref="H-CDG-01"]'); }, 15000)
-          .then(function () { if (view('results').tab) view('results').tab('hotel'); });
-      } },
-    { title: 'Add the verified hotel', text: 'One click adds it to My Journey. The price comes from the provider catalogue, never from the AI. Trip Readiness updates immediately.',
-      target: '[data-ref="H-CDG-01"]', enter: function () {
-        var j = OT.store.get('journey');
-        var has = j && (j.items || []).some(function (i) { return i.refId === 'H-CDG-01' && i.status !== 'cancelled'; });
-        if (!has && view('results').add) view('results').add('H-CDG-01');
+    { title: 'Trending from New Delhi + a package', text: 'Aggregated, anonymised IRCTC demand: how many travellers from Sunita’s home city booked each route for that weekend, the growth vs a normal weekend, and how early seats fill. Each trend becomes a train + hotel + cab + sight package priced from the verified catalogue. “Why am I seeing this?” and the consent switch keep it DPDP-compliant.',
+      target: ['[data-trend="CDG"] .fy-pkg', '[data-tour="for-you"]'], enter: function () {
+        var el = document.querySelector('[data-trend="CDG"]'); if (el) el.scrollIntoView({ block: 'center' });
         return OT.sleep(200);
       } },
-    { title: 'Add a station cab', text: 'Under Cabs, a sedan timed to the train’s 11:05 arrival is the top pick, with a price comparison against simulated providers.',
-      target: '[data-ref="C-CDG-01"]', enter: function () {
-        if (view('results').tab) view('results').tab('cab');
-        var j = OT.store.get('journey');
-        if (!(j && j.items.some(function (i) { return i.refId === 'C-CDG-01' && i.status !== 'cancelled'; })) && view('results').add) view('results').add('C-CDG-01');
-        return OT.sleep(250);
+    { title: 'Or just say it, in Hindi', text: 'Sunita speaks: “क्रिसमस पर दिल्ली से चंडीगढ़ की ट्रेन बुक करो” (book a Delhi to Chandigarh train on Christmas). Simulated ASR types it out and the live parse shows exactly what was understood: intent, from, to and date.',
+      target: '[data-tour="voice"]', enter: function () { return go('home').then(function () { return view('home').sample ? view('home').sample('hi', VOICE_HI) : null; }); } },
+    { title: 'Step 1 · Train search results', text: 'Every station pair gets a deterministic simulated timetable: Shatabdi, Vande Bharat, Express and more, with running days, class-wise fares and seat status (AVAILABLE, RAC, waitlist with a chance of confirmation, REGRET). Each train carries a verification badge, source and check time. Final booking happens on IRCTC — simulated here.',
+      target: ['.trn[data-train="12011"]', '[data-tour="trains"]'], enter: function () {
+        var u = OT.forYou && OT.forYou.persona();
+        var lws = OT.data.demand.longWeekends(null, 3), lw = lws[xmasIndex()];
+        if (u && lw) {
+          var tr = OT.data.demand.trends(u.homeCity, lw, u).filter(function (x) { return x.to === 'CDG'; })[0];
+          var pk = tr && OT.data.demand.pkg(u, tr, lw);
+          if (pk) OT.state.pendingPackage = { to: pk.to, from: pk.from, date: pk.date, ret: pk.returnDate, nights: pk.nights, hotel: pk.hotel && pk.hotel.id, cab: pk.cab && pk.cab.id, sight: pk.sight && pk.sight.id, cls: pk.cls, pax: pk.pax };
+        }
+        var p = view('home').submit ? view('home').submit() : Promise.resolve();
+        return p.then(function () { return waitFor(function () { return route() === 'trains' && document.querySelector('.trn'); }, 5000); });
       } },
-    { title: 'My Journey: one dashboard', text: 'Trip Readiness is a weighted checklist that explains every point. The timeline is drawn as a railway route line: navy for the train, saffron for local legs.',
-      target: '[data-tour="readiness"]', enter: function () { return go('journey'); } },
-    { title: 'Conflict detected', text: 'The train arrives at 11:05 but standard check-in is 14:00: a 2 h 55 min wait. The Itinerary Agent proposes three fixes.',
-      target: '[data-tour="conflict"]', enter: function () { return waitFor(function () { return document.querySelector('[data-tour="conflict"]'); }, 3000); } },
-    { title: 'Resolved, readiness rises', text: 'We leave bags at the station cloakroom and link the sample return train. The conflict turns green and the readiness ring climbs.',
+    { title: 'Step 2 · Passengers, prefilled', text: 'Choosing 12011 Kalka Shatabdi in AC Chair Car opens the passenger form, prefilled from Sunita’s profile (3 travellers, seat preferences), with an itemised fare: base fare, reservation, superfast charge, GST and a simulated convenience fee.',
+      target: '[data-tour="pax"]', enter: function () {
+        var b = document.querySelector('.trn[data-train="12011"] [data-book="CC"]') || document.querySelector('.cls-tile:not([disabled])');
+        if (b) b.click();
+        return waitFor(function () { return document.querySelector('[data-tour="pax"]'); }, 4000);
+      } },
+    { title: 'Human-in-the-loop payment', text: 'Nothing is booked until the traveller confirms. Train number, stations, date, class, names and the total are shown exactly as booked (never translated).',
+      target: '.modal', enter: function () {
+        var b = document.querySelector('#trn-pay'); if (b) b.click();
+        return waitFor(function () { return document.querySelector('.modal-backdrop.show .modal'); }, 3000);
+      } },
+    { title: 'PNR issued, journey created', text: 'A simulated PNR and e-ticket with berth status (CNF / RAC / WL with a chance of confirmation). The ticket automatically becomes the first item of My Journey, and it can be cancelled later with railway-style refund rules.',
+      target: '[data-tour="ticket"]', enter: function () {
+        clickPrimaryInModal();
+        return waitFor(function () { return document.querySelector('[data-tour="ticket"]'); }, 6000);
+      } },
+    { title: 'Step 3 · Agents plan the stay', text: '“Now plan your stay in Chandigarh” runs the orchestrator: Multilingual → Research → Verification → Recommendation → Itinerary, with tool calls, sources and timings.',
+      target: '[data-tour="trace"]', enter: function () {
+        OT.state.lastRun = null;
+        var a = document.querySelector('#plan-stay'); if (a) a.click(); else OT.go('results?to=CDG');
+        return waitFor(function () { return route() === 'results' && document.querySelector('.tr-step'); }, 5000);
+      } },
+    { title: 'Verified package items added', text: 'The Verification Agent re-checks every record at the provider: a changed price is flagged, stale data needs a re-check, a sold-out hotel is hidden. The package’s verified hotel (Hotel Shivalik View, partner P-101), station cab and heritage walk are added automatically. Prices come from the catalogue, never from the AI.',
+      target: '[data-ref="H-CDG-01"]', enter: function () {
+        return waitFor(function () { return OT.state.lastRun && OT.state.lastRun.done && document.querySelector('[data-ref="H-CDG-01"]'); }, 15000)
+          .then(function () {
+            if (view('results').tab) view('results').tab('hotel');
+            var j = OT.store.get('journey');
+            if (j && !j.items.some(function (i) { return i.refId === 'H-CDG-01'; }) && view('results').add) view('results').add('H-CDG-01');
+            if (j && !j.items.some(function (i) { return i.refId === 'C-CDG-01'; }) && view('results').add) view('results').add('C-CDG-01', { quiet: true });
+          });
+      } },
+    { title: 'My Journey: the train comes first', text: 'One dashboard. The booked train is the first node of the railway route-line timeline (navy), local legs follow in saffron. The Itinerary Agent flags a conflict: arrival 11:05 vs hotel check-in 14:00.',
+      target: ['[data-tour="conflict"]', '[data-tour="timeline"]'], enter: function () { return go('journey').then(function () { return waitFor(function () { return document.querySelector('[data-tour="timeline"]'); }, 3000); }); } },
+    { title: 'Resolved, readiness rises', text: 'We leave bags at the station cloakroom and link a return train. The conflict turns green and the weighted Trip Readiness ring climbs, with every point explained.',
       target: '[data-tour="readiness"]', enter: function () {
         if (view('journey').fix) view('journey').fix('cloak');
         var j = OT.store.get('journey');
-        if (j && !j.returnTrain && view('journey').linkReturn) view('journey').linkReturn();
+        if (j && !j.returnTrain && j.returnOption && view('journey').linkReturn) view('journey').linkReturn();
         return OT.sleep(400);
       } },
-    { title: 'Review & pay (simulated)', text: 'An itemised summary with GST shown, and the IRCTC ticket listed separately as already paid, so it is never charged again. Payment details are masked demo values.',
+    { title: 'Review & pay the stay (simulated)', text: 'Itemised hotel, cab and sight with GST shown. The train ticket appears separately as already paid, so it is never charged twice. Payment details are masked demo values.',
       target: '[data-tour="co-items"]', enter: function () { return go('checkout'); } },
-    { title: 'Human-in-the-loop confirmation', text: 'Agents propose; the traveller decides. Nothing is booked until this is confirmed. The PNR, train number, dates and amounts are shown exactly as booked and never translated.',
+    { title: 'Confirm again: human in the loop', text: 'Agents propose; the traveller decides. PNR, train number, dates and amounts stay untranslated in the confirmation.',
       target: '.modal', enter: function () {
         if (view('checkout').pay) view('checkout').pay();
         return waitFor(function () { return document.querySelector('.modal-backdrop.show .modal'); }, 3000);
       } },
-    { title: 'Booking confirmed', text: 'Booking references and a simulated transaction ID are issued. Partner P-101 is notified, and the journey items turn Confirmed.',
+    { title: 'Booking confirmed', text: 'Booking references and a simulated transaction ID are issued; partner P-101 is notified.',
       target: '[data-tour="confirmation"]', enter: function () {
-        var b = document.querySelector('.modal-backdrop .modal-foot .btn-primary');
-        if (b) b.click();
+        clickPrimaryInModal();
         return waitFor(function () { return document.querySelector('[data-tour="confirmation"]'); }, 5000);
       } },
     { title: 'Assistant answers in Hindi, aloud', text: 'The Customer Support Agent answers a refund question in Hindi, cites the policy it used, keeps the English original one tap away, and reads the reply aloud (or shows the text if this device has no Hindi voice).',
@@ -95,17 +132,17 @@
         return OT.assistant.ask('मेरा रिफंड कब आएगा?', { speak: true })
           .then(function () { return waitFor(function () { return document.querySelector('.say-card.show'); }, 1800); });
       } },
-    { title: 'Partner dashboard sees the booking', text: 'Logged in as Hotel Shivalik View (P-101), the partner sees the new booking and KPIs update.',
+    { title: 'Partner dashboard sees the booking', text: 'Logged in as Hotel Shivalik View (P-101), the partner sees the new booking highlighted as “New via OneTrip” and its KPIs update.',
       target: ['[data-tour="partner-bookings"]', function () { var l = document.querySelector('#view .pill-live'); return l && (l.closest('tr') || l); }, '#view h1', '.page-head'], enter: function () {
         if (OT.assistant) OT.assistant.close();
         if (OT.lang) OT.lang.stop();
-        OT.store.set('user', { name: 'Rajinder Singh', email: 'p101.shivalik@demo.onetrip', role: 'partner', partnerId: 'P-101', org: 'Hotel Shivalik View', simulated: true });
+        OT.store.set('user', { name: 'Rajinder Singh', email: 'p101.shivalik@demo.onetrip', role: 'partner', partnerId: 'P-101', org: 'Hotel Shivalik View', personaId: 'partner', simulated: true });
         return go('partner/bookings', 'partner');
       } },
-    { title: 'Admin & Bank: language analytics', text: 'Admin monitors users, bookings, refunds, partner performance, financial products and language usage, translation quality and support.',
-      target: ['[data-tour="admin-language"]', '#view h1', '.page-head'], enter: function () {
-        OT.store.set('user', { name: 'Ananya Rao', email: 'admin@demo.onetrip', role: 'admin', org: 'IRCTC OneTrip Admin · Partner Bank (sample)', simulated: true });
-        return go('admin/language', 'admin');
+    { title: 'Admin & Bank: long-weekend demand forecast', text: 'The data-monetisation side: aggregated route demand for upcoming long weekends (who books what, how early seats fill), which IRCTC can turn into partner insights, capacity planning and packages, under consent and k-anonymity.',
+      target: ['[data-tour="lw-forecast"]', '[data-tour="admin-language"]', '#view h1', '.page-head'], enter: function () {
+        OT.store.set('user', { name: 'Ananya Rao', email: 'admin@demo.onetrip', role: 'admin', personaId: 'admin', org: 'IRCTC OneTrip Admin · Partner Bank (sample)', simulated: true });
+        return go('admin/demand', 'admin');
       } },
     { title: 'The business case', text: 'Survey evidence (N=52), personas, the five case questions, the bank’s role, financial products, revenue model and social-mandate guardrails. End of the tour.',
       target: ['#view h1', '.page-head'], enter: function () { return go('insights'); } }
@@ -208,8 +245,10 @@
     savedUser = OT.store.get('user');
     // fresh, deterministic demo state (bookings history is kept)
     OT.state.lastRun = null; OT.state.dismissed = {}; OT.state.lastCheckout = null; OT.state.resTab = 'hotel'; OT.state.homeDraft = '';
-    OT.store.set('journey', OT.data.travel.makeJourney('CDG', {}));
-    OT.store.set('user', { name: 'Sunita Sharma', email: 'sunita.sharma@demo.onetrip', role: 'traveller', simulated: true });
+    OT.state.pendingPackage = null; OT.state.applyPackage = null; OT.state.fyLw = 0; OT.state.stay = null;
+    OT.store.set('journey', undefined);
+    OT.store.set('user', undefined);
+    if (OT.shell && OT.shell.userMenu) OT.shell.userMenu(false);
     if (OT.assistant) { OT.assistant.close(); OT.assistant.reset(); }
     if (OT.i18n.lang() !== 'en') OT.i18n.setLang('en');
     done = {}; steps.forEach(function (s) { s.hash = null; });

@@ -17,7 +17,7 @@
   };
   var STATE_LABEL = {
     booked: ['ready.s.booked', 'Booked'], planned: ['ready.s.planned', 'Planned (80%)'], confirm: ['ready.s.confirm', 'Needs confirmation (50%)'],
-    missing: ['ready.s.missing', 'Missing'], open: ['ready.s.open', 'Open conflict']
+    missing: ['ready.s.missing', 'Missing'], open: ['ready.s.open', 'Open conflict'], cancelled: ['ready.s.cancelled', 'Cancelled']
   };
 
   /* ---------------- Readiness ring ---------------- */
@@ -101,7 +101,7 @@
     if (it) {
       badge = OT.badge(it.status === 'confirmed' ? 'confirmed' : 'pending', it.status === 'confirmed' ? null : t('status.selected', 'Planned')) +
         (it.verification && it.verification !== 'verified' ? ' ' + OT.badge(it.verification) : ' ' + OT.badge('verified'));
-    } else if (e.kind === 'dep' || e.kind === 'arr') badge = OT.badge('confirmed', t('status.cnf', 'CNF')) + ' ' + OT.simTag(t('tl.sampleTiming', 'SAMPLE TIMING'));
+    } else if (e.kind === 'dep' || e.kind === 'arr') badge = statusBadge(j.train) + (e.kind === 'dep' && j.pnr ? ' <span class="xs muted">PNR ' + keep(j.pnr) + '</span>' : '') + ' ' + OT.simTag(t('tl.sampleTiming', 'SAMPLE TIMING'));
     else if (e.kind === 'rdep' || e.kind === 'rarr') badge = OT.badge('confirmed', t('status.cnf', 'CNF')) + ' ' + OT.simTag();
     var actions = '';
     if (it && e.kind !== 'checkout') {
@@ -134,7 +134,7 @@
       var after = (byAfter[e.id] || []).concat(e.itemId && e.kind !== 'checkin' && e.kind !== 'checkout' ? (byAfter[e.itemId] || []) : []);
       return nodeHTML(e, j, after);
     }).join('');
-    var ghost = j.returnTrain ? '' :
+    var ghost = j.returnTrain || !j.returnOption ? '' :
       '<li class="tl-row tl-ghost"><div class="tl-rail"><span class="tl-node">' + OT.icon('plus', 14) + '</span></div><div class="tl-card">' +
       '<div class="tl-main"><strong>' + OT.esc(t('tl.noReturn', 'Return journey not linked')) + '</strong><span class="small muted">' +
       OT.lang.highlight(t('tl.returnHint', 'Sample return: {no} {name}, {date} {dep} (PNR {pnr})', { no: j.returnOption.no, name: j.returnOption.name, date: OT.fmtDate(j.returnOption.date), dep: j.returnOption.dep, pnr: j.returnOption.pnr })) + '</span></div>' +
@@ -144,6 +144,14 @@
       '<ol class="tl">' + rows + ghost + '</ol></div>';
   }
 
+  /** Ticket status badge: CNF / RAC / WL (+ chance) / PLANNED (not booked) / CANCELLED. */
+  function statusBadge(tr) {
+    var s = tr.status || 'CNF';
+    if (s === 'CNF') return OT.badge('confirmed', t('status.cnf', 'CNF'));
+    if (s === 'PLANNED') return OT.badge('pending', t('trip.notBooked', 'Not booked yet'));
+    if (s === 'CANCELLED') return OT.badge('cancelled');
+    return OT.badge('pending', s + (tr.chance != null ? ' · ' + t('trn.chance', '{p}% chance', { p: tr.chance }) : ''));
+  }
   function tripHTML(j) {
     var tr = j.train, lang = L();
     return '<div class="ticket card" data-tour="ticket">' +
@@ -155,13 +163,15 @@
       '<div class="tk-r"><span class="tk-code">' + keep(tr.to) + '</span><span class="small">' + OT.esc(D().stationName(tr.to, lang)) + '</span><span class="tk-time">' + keep(tr.arr) + '</span></div>' +
       '</div></div>' +
       '<dl class="ticket-meta small">' +
-      '<div><dt>PNR</dt><dd>' + keep(j.pnr) + '</dd></div>' +
+      '<div><dt>PNR</dt><dd>' + (j.pnr ? keep(j.pnr) : '—') + '</dd></div>' +
       '<div><dt>' + OT.esc(t('trip.date', 'Date')) + '</dt><dd>' + keep(OT.fmtDate(tr.date)) + '</dd></div>' +
       '<div><dt>' + OT.esc(t('trip.class', 'Class')) + '</dt><dd>' + keep(tr.cls) + '</dd></div>' +
-      '<div><dt>' + OT.esc(t('trip.seats', 'Coach / seats')) + '</dt><dd>' + keep(tr.coach) + ' · ' + keep(tr.seats.join(', ')) + '</dd></div>' +
-      '<div><dt>' + OT.esc(t('trip.status', 'Status')) + '</dt><dd>' + OT.badge('confirmed', t('status.cnf', 'CNF')) + '</dd></div>' +
+      '<div><dt>' + OT.esc(t('trip.seats', 'Coach / seats')) + '</dt><dd>' + (tr.seats && tr.seats.length ? keep(tr.coach) + ' · ' + keep(tr.seats.join(', ')) : '—') + '</dd></div>' +
+      '<div><dt>' + OT.esc(t('trip.status', 'Status')) + '</dt><dd>' + statusBadge(tr) + '</dd></div>' +
       '</dl>' +
-      '<p class="xs muted ticket-note">' + OT.icon('info', 12) + ' ' + OT.esc(t('trip.note', 'Sample ticket, booked on IRCTC. OneTrip never re-books or re-charges your train.')) +
+      (tr.status === 'CANCELLED' && (j.items || []).some(function (i) { return i.status === 'confirmed'; }) ? '<p class="note note-warn small ticket-note" data-train-cancelled>' + OT.icon('alert', 14) + ' ' + OT.esc(t('trip.cancelledNote', 'Your train is cancelled, but your hotel, cab or other bookings below are still active. Cancel them in Bookings & refunds if you are no longer travelling.')) + ' <a href="#/bookings">' + OT.esc(t('nav.bookings', 'Bookings & refunds')) + '</a></p>' : '') +
+      (tr.status === 'PLANNED' ? '<p class="ticket-note"><a class="btn btn-accent btn-sm" href="#/' + OT.trains.path({ from: tr.from, to: tr.to, date: tr.date, pax: j.passengers }) + '">' + OT.icon('train', 15) + OT.esc(t('trip.bookNow', 'Book this train')) + '</a></p>' : '') +
+      '<p class="xs muted ticket-note">' + OT.icon('info', 12) + ' ' + OT.esc(j.bookedViaOneTrip ? t('trip.noteBooked', 'Booked in OneTrip on the simulated IRCTC gateway (final booking happens on IRCTC). Manage or cancel it in Bookings & refunds.') : tr.status === 'PLANNED' ? t('trip.notePlanned', 'Suggested train from the simulated timetable; not booked.') : t('trip.note', 'Sample ticket, booked on IRCTC. OneTrip never re-books or re-charges your train.')) +
       ' <a href="https://www.irctc.co.in/" target="_blank" rel="noopener">' + OT.esc(t('home.irctc', 'Continue to IRCTC ticketing')) + ' ↗</a></p></div>';
   }
 
@@ -172,7 +182,8 @@
     var due = unpaid.reduce(function (s, i) { return s + OT.agents.lineFor(i, j).amount; }, 0);
     return '<div class="card cost"><div class="card-head"><h2 class="h3">' + OT.esc(t('journey.cost', 'Trip cost')) + '</h2>' + OT.simTag() + '</div>' +
       '<div class="cost-rows small">' +
-      '<div><span>' + OT.esc(t('journey.ticketPaid', 'Train ticket (paid on IRCTC)')) + '</span>' + keep(OT.inr(j.train.fare)) + '</div>' +
+      (j.train.status === 'CANCELLED' ? '<div><span>' + OT.esc(t('journey.ticketCancelled', 'Train ticket (cancelled, refund as per railway rules)')) + '</span><s>' + keep(OT.inr(j.train.fare)) + '</s></div>'
+        : '<div><span>' + OT.esc(t('journey.ticketPaid', 'Train ticket (paid on IRCTC)')) + '</span>' + keep(OT.inr(j.train.fare)) + '</div>') +
       '<div><span>' + OT.esc(t('journey.services', 'OneTrip services ({n})', { n: items.length })) + '</span>' + keep(OT.inr(tot)) + '</div>' +
       '<div class="due"><span>' + OT.esc(t('journey.due', 'To pay now')) + '</span><strong>' + keep(OT.inr(due)) + '</strong></div></div>' +
       (unpaid.length ? '<a class="btn btn-primary btn-block" href="#/checkout" data-tour="to-checkout">' + OT.icon('wallet', 17) + OT.esc(t('journey.checkout', 'Review & pay ({n})', { n: unpaid.length })) + '</a>'
@@ -261,8 +272,9 @@
       '<button type="button" class="btn btn-ghost btn-sm" id="j-itin">' + OT.icon('layers', 16) + OT.esc(t('journey.itinBtn', 'Consolidated itinerary')) + '</button></div></div>' +
       tripHTML(j) +
       '<div class="journey-grid"><div class="j-side">' + readinessHTML(j, rd, from) + costHTML(j) + '</div>' +
-      '<div class="j-main">' + timelineHTML(j) + '</div></div></div>';
+      '<div class="j-main">' + timelineHTML(j) + '</div></div></div><div id="fy-journey"></div>';
     animateRing(el.querySelector('.ring'));
+    if (OT.forYou) OT.forYou.render(el.querySelector('#fy-journey'), { place: 'journey' });
     bind(el);
   }
 

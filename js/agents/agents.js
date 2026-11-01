@@ -116,6 +116,7 @@
     return null;
   }
   function findCity(t) {
+    if (OT.data.rail) { var cmd = OT.agents.parseCommand(t); if (cmd.to) return cmd.to; }
     var st = D().stations, dests = ['CDG', 'MDU', 'PURI'];
     for (var i = 0; i < dests.length; i++) {
       var s = st[dests[i]];
@@ -253,11 +254,18 @@
   /* ---------------- Itinerary Agent ---------------- */
   OT.agents.slotFor = function (x, j) {
     var tr = j.train, arrDate = tr.arrDate || tr.date, arrIso = dt(arrDate, tr.arr);
-    if (x.type === 'hotel') return { when: dt(arrDate, x.checkIn), endWhen: dt(D().addDays(arrDate, j.nights || 1), x.checkOut) };
+    if (x.type === 'hotel') {
+      // late arrival (after the hotel's check-in time): check in ~45 min after the train arrives
+      var ci = dt(arrDate, x.checkIn);
+      if (isoMs(ci) < isoMs(arrIso)) ci = addMinIso(arrIso, 45);
+      return { when: ci, endWhen: dt(D().addDays(arrDate, j.nights || 1), x.checkOut) };
+    }
     if (x.type === 'cab' && x.offsetMin != null) return { when: addMinIso(arrIso, x.offsetMin), endWhen: addMinIso(arrIso, x.offsetMin + (x.durationMin || 20)) };
     if (x.type === 'food' && x.onTrain) return { when: dt(tr.date, x.slot) };
     var day = x.day || 0, base = D().addDays(arrDate, day);
     var w = dt(base, x.slot || '10:00');
+    // never plan a sight or meal before the train arrives (+1 h to reach it): move it to the next day
+    if (isoMs(w) < isoMs(arrIso) + 3600000) w = dt(D().addDays(base, 1), x.slot || '10:00');
     return { when: w, endWhen: x.durationMin ? addMinIso(w, x.durationMin) : undefined };
   };
 
@@ -362,8 +370,8 @@
     var W = OT.agents.READINESS_WEIGHTS, parts = [];
     if (!j || !j.train) return { score: 0, parts: [] };
     var items = activeItems(j);
-    var tf = j.train.status === 'CNF' ? 1 : j.train.status === 'RAC' ? 0.5 : 0;
-    parts.push({ id: 'ticket', w: W.ticket, pts: W.ticket * tf, state: tf === 1 ? 'booked' : 'confirm' });
+    var tf = { CNF: 1, RAC: 0.5, WL: 0.25 }[j.train.status] || 0;
+    parts.push({ id: 'ticket', w: W.ticket, pts: W.ticket * tf, state: tf === 1 ? 'booked' : tf > 0 ? 'confirm' : j.train.status === 'CANCELLED' ? 'cancelled' : 'missing' });
     function best(filter) {
       var c = items.filter(filter).map(credit).sort(function (a, b) { return b.f - a.f; })[0];
       return c || { f: 0, state: 'missing' };
@@ -396,6 +404,10 @@
   /** Policy-based refund: booking -> {pct, amount, freeUntil, hoursLeft, policy} */
   OT.agents.refundFor = function (b, nowMs) {
     nowMs = nowMs || Date.now();
+    if (b.type === 'train' && b.ticket && OT.data.rail) {
+      var rr = OT.data.rail.refund(b.ticket, nowMs);
+      return { pct: b.amount ? Math.round(rr.amount / b.amount * 100) : 0, amount: rr.amount, charge: rr.charge, hoursLeft: rr.hoursLeft, policy: { rail: true, rule: rr.rule }, start: nowMs + rr.hoursLeft * 3600000 };
+    }
     var j = OT.store.get('journey'), it = j && (j.items || []).filter(function (i) { return i.id === b.itemId; })[0];
     var x = D().get(b.refId || (it && it.refId)) || {};
     var start = it && it.when ? isoMs(it.when) : (b.startAt ? isoMs(b.startAt) : nowMs + 7 * 86400000);
@@ -408,6 +420,7 @@
   };
   OT.agents.policyText = function (pol, lang) {
     var T = lang && OT.i18n ? function (k, fb, v) { return OT.i18n.tIn(lang, k, fb, v); } : function (k, fb, v) { return OT.t ? OT.t(k, fb, v) : fb; };
+    if (pol && pol.rail) return T('rail.policy', 'Railway-style refund (simulated): flat charge per passenger if cancelled more than 48 h before departure, 25% of fare up to 12 h, 50% up to 4 h, nothing after chart preparation; waitlisted/RAC: ₹60 per passenger. Convenience fee is not refunded.');
     if (!pol) return T('pol.none', 'Cancellation policy not published by provider. Contact provider before booking.');
     if (pol.fullUntilH === 0 && pol.thenPct === 0) return T('pol.payAtUse', 'Pay-at-use or no-refund item: cancel any time before use, nothing is charged in advance online (sample).');
     if (pol.fullUntilH === 0) return T('pol.flex', 'Fully refundable until use.');
@@ -582,6 +595,118 @@
       agent: 'Partner Agent', note: 'Draft by Partner Agent (simulated). Review before sending; it never promises prices or availability not in your listing.' };
     if (lang !== 'hi' && lang !== 'en') out.note += ' Reply drafted in English: ' + (OT.lang ? OT.lang.info(lang).name : lang) + ' drafting needs live NMT.';
     out.toString = function () { return out.text; };
+    return out;
+  };
+
+  /* ---------------- Command parser (v1.1): voice/text in English, Hinglish and Indian languages ----------------
+   * OT.agents.parseCommand(text) -> {intent:'train'|'hotel'|'cab'|'food'|'sight'|'status'|'refund'|'cancel'|'pnr'|null,
+   *                                  from, to, date, dateSaid, cls, pax, missing[], heard}
+   */
+  var TRAIN_KW = ['train', 'trains', 'rail', 'ticket', 'tickets', 'ट्रेन', 'रेल', 'रेलगाड़ी', 'गाड़ी', 'गाडी', 'टिकट', 'ரயில்', 'டிக்கெட்', 'ট্রেন', 'টিকিট', 'రైలు', 'ట్రైన్', 'టికెట్', 'ರೈಲು', 'ಟಿಕೆಟ್', 'ട്രെയിൻ', 'ടിക്കറ്റ്', 'ટ્રેન', 'ટિકિટ', 'ਟ੍ਰੇਨ', 'ਰੇਲ', 'ਟਿਕਟ', 'ଟ୍ରେନ', 'ଟିକେଟ'];
+  var FROM_KW = ['from', ' se ', 'से', 'இலிருந்து', 'லிருந்து', 'থেকে', 'నుండి', 'ನಿಂದ', 'ಇಂದ', 'നിന്ന്', 'થી', 'ਤੋਂ', 'ରୁ', 'पासून', 'हून'];
+  var MON3 = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  var MON_HI = { 'जनवरी': 0, 'फ़रवरी': 1, 'फरवरी': 1, 'मार्च': 2, 'अप्रैल': 3, 'मई': 4, 'जून': 5, 'जुलाई': 6, 'अगस्त': 7, 'सितंबर': 8, 'सितम्बर': 8, 'अक्टूबर': 9, 'नवंबर': 10, 'नवम्बर': 10, 'दिसंबर': 11, 'दिसम्बर': 11 };
+  var WEEK = [
+    ['sunday', 'sun', 'ravivar', 'रविवार', 'इतवार', 'ஞாயிறு', 'রবিবার', 'ఆదివారం', 'ಭಾನುವಾರ', 'ഞായർ', 'રવિવાર', 'ਐਤਵਾਰ', 'ରବିବାର'],
+    ['monday', 'mon', 'somvar', 'सोमवार', 'திங்கள்', 'সোমবার', 'సోమవారం', 'ಸೋಮವಾರ', 'തിങ്കൾ', 'સોમવાર', 'ਸੋਮਵਾਰ', 'ସୋମବାର'],
+    ['tuesday', 'tue', 'mangalvar', 'मंगलवार', 'செவ்வாய்', 'মঙ্গলবার', 'మంగళవారం', 'ಮಂಗಳವಾರ', 'ചൊവ്വ', 'મંગળવાર', 'ਮੰਗਲਵਾਰ', 'ମଙ୍ଗଳବାର'],
+    ['wednesday', 'wed', 'budhvar', 'बुधवार', 'புதன்', 'বুধবার', 'బుధవారం', 'ಬುಧವಾರ', 'ബുധൻ', 'બુધવાર', 'ਬੁੱਧਵਾਰ', 'ବୁଧବାର'],
+    ['thursday', 'thu', 'guruvar', 'गुरुवार', 'வியாழன்', 'বৃহস্পতিবার', 'గురువారం', 'ಗುರುವಾರ', 'വ്യാഴം', 'ગુરુવાર', 'ਵੀਰਵਾਰ', 'ଗୁରୁବାର'],
+    ['friday', 'fri', 'shukravar', 'शुक्रवार', 'வெள்ளி', 'শুক্রবার', 'శుక్రవారం', 'ಶುಕ್ರವಾರ', 'വെള്ളി', 'શુક્રવાર', 'ਸ਼ੁੱਕਰਵਾਰ', 'ଶୁକ୍ରବାର'],
+    ['saturday', 'sat', 'shanivar', 'शनिवार', 'சனி', 'শনিবার', 'శనివారం', 'ಶನಿವಾರ', 'ശനി', 'શનિવાર', 'ਸ਼ਨੀਵਾਰ', 'ଶନିବାର']
+  ];
+  var REL = [[0, ['today', 'tonight', 'aaj', 'आज', 'இன்று', 'আজ', 'ఈరోజు', 'ಇಂದು', 'ഇന്ന്', 'આજે', 'ਅੱਜ', 'ଆଜି']],
+    [2, ['day after tomorrow', 'parso', 'parson', 'परसों', 'நாளை மறுநாள்', 'পরশু', 'ఎల్లుండి', 'ನಾಡಿದ್ದು', 'മറ്റന്നാൾ', 'પરમ દિવસે', 'ਪਰਸੋਂ', 'ପରଦିନ']],
+    [1, ['tomorrow', 'tmrw', 'kal', 'कल', 'उद्या', 'நாளை', 'আগামীকাল', 'কাল', 'రేపు', 'ನಾಳೆ', 'നാളെ', 'આવતીકાલે', 'કાલે', 'ਕੱਲ੍ਹ', 'ଆସନ୍ତାକାଲି', 'କାଲି']]];
+  var HOLI = [['christmas', '12-25'], ['क्रिसमस', '12-25'], ['xmas', '12-25'], ['republic day', '01-26'], ['गणतंत्र दिवस', '01-26'], ['independence day', '08-15'], ['स्वतंत्रता दिवस', '08-15'], ['gandhi jayanti', '10-02'], ['गांधी जयंती', '10-02']];
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function ymdOf(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function futureDate(m, d) { var t = new Date(); t.setHours(0, 0, 0, 0); var x = new Date(t.getFullYear(), m, d); if (x < t) x = new Date(t.getFullYear() + 1, m, d); return ymdOf(x); }
+  function wordIn(t, w) { return /^[a-z ]+$/.test(w) ? new RegExp('(^|[^a-z])' + w + '([^a-z]|$)').test(t) : t.indexOf(w) >= 0; }
+  function parseDate(t) {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var m = t.match(/\b(20\d\d)-(\d\d)-(\d\d)\b/);
+    if (m) return m[0];
+    m = t.match(/\b(\d{1,2})[\/.](\d{1,2})(?:[\/.](\d{2,4}))?\b/);
+    if (m && +m[2] >= 1 && +m[2] <= 12 && +m[1] >= 1 && +m[1] <= 31) return m[3] ? (m[3].length === 2 ? '20' + m[3] : m[3]) + '-' + pad2(+m[2]) + '-' + pad2(+m[1]) : futureDate(+m[2] - 1, +m[1]);
+    m = t.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*/) || null;
+    if (m) return futureDate(MON3[m[2]], +m[1]);
+    m = t.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?\b/);
+    if (m) return futureDate(MON3[m[1]], +m[2]);
+    for (var k in MON_HI) { var mm = t.match(new RegExp('(\\d{1,2})\\s*' + k)); if (mm) return futureDate(MON_HI[k], +mm[1]); }
+    for (var h = 0; h < HOLI.length; h++) if (wordIn(t, HOLI[h][0])) { var p = HOLI[h][1].split('-'); return futureDate(+p[0] - 1, +p[1]); }
+    if (/guru nanak|gurpurab|गुरु नानक|गुरपुरब/.test(t) && OT.data.demand) { var g = OT.data.demand.holidays().filter(function (x) { return /Guru Nanak/.test(x.name) && x.date > ymdOf(today); })[0]; if (g) return g.date; }
+    for (var r = 0; r < REL.length; r++) for (var j = 0; j < REL[r][1].length; j++) if (wordIn(t, REL[r][1][j])) { var dd = new Date(today); dd.setDate(dd.getDate() + REL[r][0]); return ymdOf(dd); }
+    if (/\b(this |coming )?weekend\b|वीकेंड|सप्ताहांत/.test(t)) { var s = new Date(today); s.setDate(s.getDate() + ((6 - s.getDay() + 7) % 7 || 7)); return ymdOf(s); }
+    for (var w = 0; w < WEEK.length; w++) for (var q = 0; q < WEEK[w].length; q++) {
+      if (wordIn(t, WEEK[w][q])) {
+        var x = new Date(today), diff = (w - x.getDay() + 7) % 7;
+        if (diff === 0 || /next/.test(t)) diff = diff || 7;
+        x.setDate(x.getDate() + diff); return ymdOf(x);
+      }
+    }
+    return null;
+  }
+  function parseCls(t) {
+    var m = t.match(/\b(1a|2a|3a|3e|sl|cc|ec)\b/);
+    if (m) return m[1].toUpperCase();
+    if (/first ac|1st ac|फर्स्ट एसी/.test(t)) return '1A';
+    if (/second ac|2nd ac|2 tier|two tier|सेकंड एसी/.test(t)) return '2A';
+    if (/third ac|3rd ac|3 tier|three tier|थर्ड एसी/.test(t)) return '3A';
+    if (/sleeper|स्लीपर/.test(t)) return 'SL';
+    if (/executive/.test(t)) return 'EC';
+    if (/chair car|चेयर कार/.test(t)) return 'CC';
+    return null;
+  }
+  function parsePax(t) {
+    var m = t.match(/(\d)\s*(people|persons|person|passengers|pax|adults|travellers|travelers|tickets|seats|log|लोग|यात्री|जन|பேர்|জন)/);
+    if (m) return +m[1];
+    m = t.match(/family of (\d)/); if (m) return +m[1];
+    var words = { 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'do': 2, 'teen': 3, 'char': 4, 'दो': 2, 'तीन': 3, 'चार': 4, 'पांच': 5, 'पाँच': 5 };
+    for (var w in words) if (new RegExp('(^|[^a-zऀ-ॿ])' + w + '\\s+(people|persons|passengers|log|लोग|यात्री|tickets)').test(t)) return words[w];
+    return null;
+  }
+  OT.agents.parseCommand = function (text) {
+    var raw = String(text || '').trim();
+    var t = (OT.lang ? OT.lang.normDigits(raw) : raw).toLowerCase().replace(/[।?!,]/g, ' ');
+    var R = OT.data.rail;
+    var ms = R ? R.mentions(t) : [];
+    var out = { heard: raw, intent: null, from: null, to: null, date: null, dateSaid: false, cls: parseCls(t), pax: parsePax(t), mentions: ms.map(function (m) { return m.code; }), missing: [] };
+    var fromIdx = -1;
+    FROM_KW.forEach(function (k) { var i = (' ' + t + ' ').indexOf(k); if (i >= 0 && (fromIdx < 0 || i < fromIdx)) fromIdx = i; });
+    if (ms.length >= 2) {
+      var a = ms[0], b = ms[1];
+      out.from = a.code; out.to = b.code;
+      // "to Mumbai from Chandigarh"
+      var toEn = t.search(/(^|[^a-z])to\s/), fromEn = t.search(/(^|[^a-z])from\s/);
+      if (fromEn >= 0 && toEn >= 0 && toEn < fromEn && b.index > fromEn) { out.from = b.code; out.to = a.code; }
+    } else if (ms.length === 1) {
+      var m0 = ms[0], after = t.slice(m0.index + m0.len, m0.index + m0.len + 14), before = t.slice(Math.max(0, m0.index - 6), m0.index);
+      var isFrom = /from\s*$/.test(before) || FROM_KW.some(function (k) { k = k.trim(); return k && k !== 'from' && after.trim().indexOf(k) === 0; }) || /^\s*se\b/.test(after);
+      if (isFrom) out.from = m0.code; else out.to = m0.code;
+    }
+    var d = parseDate(t);
+    if (d) { out.date = d; out.dateSaid = true; }
+    var kw = function (list) { return has(t, list); };
+    var support = OT.agents.supportIntent(t);
+    var strongTrain = /\btrains?\b|\btickets?\b|ट्रेन|टिकट|ট্রেন|టికెట్|ట్రైన్|ಟಿಕೆಟ್|ട്രെയിൻ|ટ્રેન|ਟ੍ਰੇਨ|ଟ୍ରେନ/.test(t) || (/\bbook\b|बुक/.test(t) && ms.length >= 2);
+    if (kw(KW.hotel) && !strongTrain) out.intent = 'hotel';
+    else if (strongTrain || kw(TRAIN_KW) && !kw(KW.hotel) || (/\bbook\b|बुक/.test(t) && ms.length >= 1) || (ms.length >= 2 && !kw(KW.cab))) out.intent = 'train';
+    else if (kw(KW.hotel)) out.intent = 'hotel';
+    else if (kw(KW.cab)) out.intent = 'cab';
+    else if (kw(KW.food)) out.intent = 'food';
+    else if (kw(KW.sight) && ms.length) out.intent = 'sight';
+    if (!out.intent && support && ['refund', 'cancel', 'status', 'pnr', 'human', 'checkin'].indexOf(support) >= 0) out.intent = support === 'checkin' ? 'status' : support;
+    if (!out.intent && ms.length === 1) out.intent = 'hotel';
+    if (out.intent === 'train') {
+      var u = OT.store.get('user');
+      if (!out.from && u && u.homeCity && u.homeCity !== out.to) { out.from = u.homeCity; out.fromAssumed = true; }
+      if (!out.to) out.missing.push('to');
+      if (!out.from) out.missing.push('from');
+    }
+    if ((out.intent === 'hotel' || out.intent === 'cab' || out.intent === 'food' || out.intent === 'sight') && !out.to) out.to = out.from, out.from = null;
+    if ((out.intent === 'hotel' || out.intent === 'cab' || out.intent === 'food' || out.intent === 'sight') && !out.to) out.missing.push('city');
+    if (!out.intent) out.missing.push('intent');
     return out;
   };
 })();

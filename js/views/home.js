@@ -1,33 +1,41 @@
-/* IRCTC OneTrip — Home: station name-board hero, journey search (text + voice), PNR import. (Builder A) */
+/* IRCTC OneTrip — Home (v1.1): Step 1 train search (from/to/date/class/passengers), an intent-routing
+ * "just say it" box (voice or text, any language: train / hotel / cab / status / refund), the station
+ * name-board hero, "For you" personalised suggestions, PNR import and sample journeys. (Builder A)
+ */
 (function () {
   'use strict';
   var OT = window.OT;
   var D = function () { return OT.data.travel; };
-  var timer = null, rec = null, root = null;
+  var timer = null, rec = null, root = null, navTimer = null;
 
-  var ZONES = { NR: { en: 'Northern Railway', hi: 'उत्तर रेलवे' }, SR: { en: 'Southern Railway', hi: 'दक्षिण रेलवे' }, ECoR: { en: 'East Coast Railway', hi: 'पूर्व तट रेलवे' }, ER: { en: 'Eastern Railway', hi: 'पूर्व रेलवे' } };
-  var BOARD_ORDER = { CDG: ['hi', 'en', 'pa'], MDU: ['ta', 'en', 'hi'], PURI: ['or', 'en', 'hi'] };
+  var ZONES = { NR: { en: 'Northern Railway', hi: 'उत्तर रेलवे' }, SR: { en: 'Southern Railway', hi: 'दक्षिण रेलवे' }, ECoR: { en: 'East Coast Railway', hi: 'पूर्व तट रेलवे' }, ER: { en: 'Eastern Railway', hi: 'पूर्व रेलवे' },
+    CR: { en: 'Central Railway', hi: 'मध्य रेलवे' }, WR: { en: 'Western Railway', hi: 'पश्चिम रेलवे' }, NWR: { en: 'North Western Railway', hi: 'उत्तर पश्चिम रेलवे' }, NCR: { en: 'North Central Railway', hi: 'उत्तर मध्य रेलवे' },
+    ECR: { en: 'East Central Railway', hi: 'पूर्व मध्य रेलवे' }, WCR: { en: 'West Central Railway', hi: 'पश्चिम मध्य रेलवे' }, SWR: { en: 'South Western Railway', hi: 'दक्षिण पश्चिम रेलवे' },
+    SCR: { en: 'South Central Railway', hi: 'दक्षिण मध्य रेलवे' }, KR: { en: 'Konkan Railway', hi: 'कोंकण रेलवे' }, NFR: { en: 'Northeast Frontier Railway', hi: 'पूर्वोत्तर सीमांत रेलवे' } };
+  var BOARD_ORDER = { CDG: ['hi', 'en', 'pa'], MDU: ['ta', 'en', 'hi'], PURI: ['or', 'en', 'hi'], CSMT: ['mr', 'en', 'hi'], MAS: ['ta', 'en', 'hi'], HWH: ['bn', 'en', 'hi'], SBC: ['kn', 'en', 'hi'],
+    SC: ['te', 'en', 'hi'], ADI: ['gu', 'en', 'hi'], ASR: ['pa', 'en', 'hi'], TVC: ['ml', 'en', 'hi'], ERS: ['ml', 'en', 'hi'], BBS: ['or', 'en', 'hi'], PUNE: ['mr', 'en', 'hi'] };
   var PREFS = [
-    { k: 'veg', key: 'pref.veg', en: 'Veg food' },
-    { k: 'nearStation', key: 'pref.near', en: 'Near station' },
-    { k: 'freeCancel', key: 'pref.freeCancel', en: 'Free cancellation' },
-    { k: 'family', key: 'pref.family', en: 'Family' },
-    { k: 'temple', key: 'pref.temple', en: 'Temple visit' }
+    { k: 'veg', key: 'pref.veg', en: 'Veg food' }, { k: 'nearStation', key: 'pref.near', en: 'Near station' },
+    { k: 'freeCancel', key: 'pref.freeCancel', en: 'Free cancellation' }, { k: 'family', key: 'pref.family', en: 'Family' }, { k: 'temple', key: 'pref.temple', en: 'Temple visit' }
   ];
+  var SAMPLE_EN = 'book from Chandigarh to Mumbai train';
+  function t(k, fb, v) { return OT.t(k, fb, v); }
+  function L() { return OT.i18n.lang(); }
 
   function boardScripts(code) {
-    var first = BOARD_ORDER[code] || ['en', 'hi'];
-    var cur = OT.i18n.lang();
-    var rest = OT.i18n.languages.map(function (l) { return l.code; }).filter(function (c) { return first.indexOf(c) < 0; });
-    if (first.indexOf(cur) < 0) { rest = rest.filter(function (c) { return c !== cur; }); rest.unshift(cur); }
+    var first = BOARD_ORDER[code] || ['hi', 'en'];
+    var s = D().stations[code];
+    first = first.filter(function (c) { return s.names[c]; });
+    var cur = L();
+    var rest = OT.i18n.languages.map(function (l) { return l.code; }).filter(function (c) { return first.indexOf(c) < 0 && s.names[c]; });
+    if (first.indexOf(cur) < 0 && s.names[cur]) { rest = rest.filter(function (c) { return c !== cur; }); rest.unshift(cur); }
     return first.concat(rest);
   }
-
   function boardHTML(code) {
     var s = D().stations[code];
     var z = ZONES[s.zone] || ZONES.NR;
     var first = boardScripts(code)[0];
-    return '<div class="stn-board" role="img" aria-label="' + OT.esc(OT.t('home.boardAria', 'Destination station board: {name}', { name: s.names.en })) + '">' +
+    return '<div class="stn-board" role="img" aria-label="' + OT.esc(t('home.boardAria', 'Destination station board: {name}', { name: s.names.en })) + '">' +
       '<div class="board-plate">' +
       '<div class="board-top"><span class="board-code">' + OT.esc(code) + '</span><span class="board-zone">' + OT.esc(z.hi) + ' · ' + OT.esc(z.en) + '</span></div>' +
       '<div class="board-name-wrap"><div class="board-name" data-board-name lang="' + first + '">' + OT.esc(s.names[first] || s.names.en) + '</div></div>' +
@@ -35,7 +43,6 @@
       '<div class="board-foot"><span data-board-lang>' + OT.esc(OT.lang ? OT.lang.info(first).native : first) + '</span><span class="board-dots" data-board-dots></span></div>' +
       '</div><div class="board-legs" aria-hidden="true"><span></span><span></span></div></div>';
   }
-
   function cycleBoard(code) {
     clearInterval(timer);
     var order = boardScripts(code), i = 0, s = D().stations[code];
@@ -57,112 +64,113 @@
       }, 260);
     }, 2300);
   }
-
-  function opt(code, sel, list) {
-    return list.map(function (c) {
-      return '<option value="' + c + '"' + (c === sel ? ' selected' : '') + '>' + OT.esc(D().stationName(c, OT.i18n.lang())) + ' (' + c + ')</option>';
-    }).join('');
+  function setBoard(code) {
+    var slot = root && root.querySelector('[data-board-slot]');
+    if (!slot || !code || !D().stations[code]) return;
+    if (slot.getAttribute('data-code') === code) return;
+    slot.setAttribute('data-code', code);
+    slot.innerHTML = boardHTML(code);
+    cycleBoard(code);
   }
 
   function render(el, params) {
     root = el;
     var q = params.query || {};
+    var u = OT.store.get('user') || {};
     var j = OT.store.get('journey');
-    var to = q.to || (j && j.scenario) || 'CDG';
-    if (!D().scenarios[to]) to = 'CDG';
-    var sc = D().scenarios[to];
-    var prefs = (j && j.scenario === to && j.prefs) || sc.prefs;
-    var date = (j && j.scenario === to && j.train.date) || D().defaultDate();
-    var pax = (j && j.scenario === to && j.passengers) || sc.passengers;
-    var budget = (j && j.scenario === to && j.budget) || sc.budget;
-    var st = OT.state.homeDraft || '';
-    var t = OT.t;
+    var stay = OT.state.stay || {};
+    var from = q.from || u.homeCity || 'NDLS';
+    var to = q.to || (j && j.train && j.train.to !== from ? j.train.to : (from === 'CDG' ? 'NDLS' : 'CDG'));
+    if (!D().stations[to]) to = 'CDG';
+    var budget = stay.budget || u.budget || (D().scenarios[to] ? D().scenarios[to].budget : 3000);
+    var prefs = stay.prefs || u.prefs || (D().scenarios[to] ? D().scenarios[to].prefs : { nearStation: true });
+    var draft = OT.state.homeDraft || '';
+    var TR = OT.trains;
 
     el.innerHTML =
       '<section class="hero">' +
       '<div class="container hero-grid">' +
       '<div class="hero-copy">' +
       '<p class="kicker">' + OT.icon('train', 16) + ' <span>' + OT.esc(t('hero.kicker', 'Rail-first trip planner · 11 Indian languages')) + '</span></p>' +
-      '<h1>' + OT.esc(t('hero.title', 'Your train is booked. Plan everything after it, in your language.')) + '</h1>' +
+      '<h1>' + OT.esc(t('hero.title2', 'Book your train. Then plan everything after it, in your language.')) + '</h1>' +
       '<p class="lead">' + OT.esc(t('hero.sub', 'Hotel, station cab, food and sightseeing, verified by AI agents and arranged around your train in one journey dashboard.')) + '</p>' +
-      '<button type="button" class="btn btn-ghost btn-sm hero-demo" data-start-tour>' + OT.icon('play', 14) + OT.esc(t('home.demo', 'Start the 3-minute guided demo')) + '</button>' +
-      '<div class="board-slot" data-board-slot>' + boardHTML(to) + '</div>' +
+      '<div class="row-wrap"><button type="button" class="btn btn-ghost btn-sm hero-demo" data-start-tour>' + OT.icon('play', 14) + OT.esc(t('home.demo', 'Start the 3-minute guided demo')) + '</button>' +
+      (u.name ? '' : '<a class="btn btn-link small" href="#/login">' + OT.icon('user', 14) + ' ' + OT.esc(t('home.personas', 'Sign in as a demo persona')) + '</a>') + '</div>' +
+      '<div class="board-slot" data-board-slot data-code="' + to + '">' + boardHTML(to) + '</div>' +
       '</div>' +
-      '<form class="search-card card" id="trip-form" novalidate>' +
-      '<div class="ask voice-box" data-tour="voice">' +
+      '<div class="search-card card" id="trip-form">' +
+      /* Step 1: trains */
+      '<form id="train-form" class="train-form" novalidate data-tour="train-form">' +
+      '<p class="step-label">' + OT.icon('train', 15) + ' ' + OT.esc(t('home.step1', 'Step 1 · Find trains')) + '</p>' +
+      '<div class="tf-grid">' + TR.picker('tf-from', from, t('search.from', 'From')) +
+      '<button type="button" class="icon-btn swap" id="tf-swap" aria-label="' + OT.esc(t('trn.swap', 'Swap stations')) + '">' + OT.icon('refresh', 16) + '</button>' +
+      TR.picker('tf-to', to, t('search.to', 'To')) + '</div>' +
+      '<div class="tf-grid2">' +
+      '<div class="field"><label for="tf-date">' + OT.esc(t('search.date', 'Travel date')) + '</label><input id="tf-date" class="input" type="date" min="' + OT.data.rail.ymd(new Date()) + '" value="' + OT.esc(q.date || TR.tomorrow()) + '"></div>' +
+      '<div class="field"><label for="tf-cls">' + OT.esc(t('trn.class', 'Class')) + '</label><select id="tf-cls" class="input"><option value="">' + OT.esc(t('trn.allCls', 'All classes')) + '</option>' +
+      ['1A', '2A', '3A', '3E', 'SL', 'CC', 'EC'].map(function (c) { return '<option value="' + c + '">' + c + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label for="tf-pax">' + OT.esc(t('search.pax', 'Travellers')) + '</label><select id="tf-pax" class="input">' + [1, 2, 3, 4, 5, 6].map(function (n) { return '<option' + (n === (u.party ? u.party.length : 2) ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="form-error hidden" id="tf-err" role="alert"></div>' +
+      '<button type="submit" class="btn btn-primary btn-lg btn-block" id="train-go">' + OT.icon('search', 18) + OT.esc(t('trn.search', 'Search trains')) + '</button>' +
+      '</form>' +
+      '<div class="or-rule"><span>' + OT.esc(t('home.orSay', 'or just say it, in any language')) + '</span></div>' +
+      /* ask box */
+      '<form class="ask voice-box" id="ask-form" data-tour="voice" novalidate>' +
       '<label class="label" for="ask-input">' + OT.esc(t('search.ask', 'Ask in your language')) + '</label>' +
       '<div class="ask-row">' +
       '<button type="button" class="icon-btn mic-btn" id="home-mic" aria-label="' + OT.esc(t('search.voice', 'Speak your query')) + '" title="' + OT.esc(t('search.voice', 'Speak your query')) + '">' + OT.icon('mic', 22) + '</button>' +
-      '<textarea id="ask-input" class="input ask-input" rows="2" placeholder="' + OT.esc(t('search.askPh', 'e.g. Hotel near Chandigarh station under ₹3,000')) + '">' + OT.esc(st) + '</textarea>' +
+      '<textarea id="ask-input" class="input ask-input" rows="2" placeholder="' + OT.esc(t('home.askPh', 'e.g. “book from Chandigarh to Mumbai train on Friday” or “hotel near Chandigarh station under ₹3,000”')) + '">' + OT.esc(draft) + '</textarea>' +
+      '<button type="submit" class="icon-btn send-btn" id="go-btn" aria-label="' + OT.esc(t('home.go', 'Go')) + '" title="' + OT.esc(t('home.go', 'Go')) + '">' + OT.icon('arrowRight', 20) + '</button>' +
       '</div>' +
       '<div class="voice-status" id="voice-status" aria-live="polite"></div>' +
       '<div class="translit hidden" id="translit"></div>' +
       '<div class="parse-preview" id="parse-preview" aria-live="polite"></div>' +
       '<div class="samples"><span class="xs muted">' + OT.esc(t('search.samplesLabel', 'No mic? Try a sample voice query:')) + '</span>' +
-      '<button type="button" class="chip sample-chip" data-sample="hi">' + OT.icon('play', 12) + ' हिन्दी · ' + OT.esc(t('search.sampleHi', 'Hindi')) + '</button>' +
-      '<button type="button" class="chip sample-chip" data-sample="ta">' + OT.icon('play', 12) + ' தமிழ் · ' + OT.esc(t('search.sampleTa', 'Tamil')) + '</button>' +
-      '<button type="button" class="chip sample-chip" data-sample="bn">' + OT.icon('play', 12) + ' বাংলা · ' + OT.esc(t('search.sampleBn', 'Bengali')) + '</button>' +
+      '<button type="button" class="chip sample-chip" data-sample="hi">' + OT.icon('play', 12) + ' हिन्दी · ' + OT.esc(t('home.sampleHotel', 'hotel')) + '</button>' +
+      '<button type="button" class="chip sample-chip" data-sample="en">' + OT.icon('play', 12) + ' English · ' + OT.esc(t('home.sampleTrain', 'train')) + '</button>' +
+      '<button type="button" class="chip sample-chip" data-sample="ta">' + OT.icon('play', 12) + ' தமிழ் · ' + OT.esc(t('home.sampleHotel', 'hotel')) + '</button>' +
+      '<button type="button" class="chip sample-chip" data-sample="bn">' + OT.icon('play', 12) + ' বাংলা · ' + OT.esc(t('home.sampleHotel', 'hotel')) + '</button>' +
       '</div>' +
-      '</div>' +
-      '<div class="or-rule"><span>' + OT.esc(t('search.orForm', 'or fill in your trip')) + '</span></div>' +
-      '<div class="trip-grid">' +
-      '<div class="field"><label for="f-from">' + OT.esc(t('search.from', 'From')) + '</label><select id="f-from" class="input">' + opt('from', sc.from, ['NDLS', 'MS', 'HWH']) + '</select></div>' +
-      '<div class="field"><label for="f-to">' + OT.esc(t('search.to', 'To')) + '</label><select id="f-to" class="input">' + opt('to', to, ['CDG', 'MDU', 'PURI']) + '</select></div>' +
-      '<div class="field"><label for="f-date">' + OT.esc(t('search.date', 'Travel date')) + '</label><input id="f-date" class="input" type="date" value="' + OT.esc(date) + '"></div>' +
-      '<div class="field"><label for="f-pax">' + OT.esc(t('search.pax', 'Travellers')) + '</label><select id="f-pax" class="input">' + [1, 2, 3, 4, 5, 6].map(function (n) { return '<option' + (n === pax ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></div>' +
-      '<div class="field field-wide"><label for="f-budget">' + OT.esc(t('search.budget', 'Hotel budget per night')) + '</label><div class="rupee-input"><span>₹</span><input id="f-budget" class="input" type="number" min="500" max="20000" step="100" value="' + budget + '" inputmode="numeric"></div></div>' +
-      '</div>' +
-      '<div class="field"><span class="label">' + OT.esc(t('search.prefs', 'Preferences')) + '</span><div class="chips" id="f-prefs">' +
-      PREFS.map(function (p) { return '<button type="button" class="chip" data-pref="' + p.k + '" aria-pressed="' + (prefs[p.k] ? 'true' : 'false') + '">' + OT.esc(t(p.key, p.en)) + '</button>'; }).join('') +
-      '</div></div>' +
-      '<div class="form-error hidden" id="form-error" role="alert"></div>' +
-      '<button type="submit" class="btn btn-primary btn-lg btn-block" id="go-btn">' + OT.icon('search', 18) + OT.esc(t('search.go', 'Find verified options')) + '</button>' +
-      '<div class="form-foot">' +
-      '<button type="button" class="btn-link small" id="pnr-btn">' + OT.icon('train', 14) + ' ' + OT.esc(t('search.pnr', 'Import my train from PNR (simulated)')) + '</button>' +
-      '<a class="small" href="https://www.irctc.co.in/" target="_blank" rel="noopener">' + OT.esc(t('home.irctc', 'Continue to IRCTC ticketing')) + ' ↗</a>' +
-      '</div>' +
+      '<details class="stay-prefs"><summary class="small">' + OT.icon('hotel', 14) + ' ' + OT.esc(t('home.stayPrefs', 'Stay preferences (hotel budget, veg, family…)')) + '</summary>' +
+      '<div class="field mt8"><label for="f-budget">' + OT.esc(t('search.budget', 'Hotel budget per night')) + '</label><div class="rupee-input"><span>₹</span><input id="f-budget" class="input" type="number" min="500" max="20000" step="100" value="' + budget + '" inputmode="numeric"></div></div>' +
+      '<div class="chips mt8" id="f-prefs">' + PREFS.map(function (p) { return '<button type="button" class="chip" data-pref="' + p.k + '" aria-pressed="' + (prefs[p.k] ? 'true' : 'false') + '">' + OT.esc(t(p.key, p.en)) + '</button>'; }).join('') + '</div></details>' +
       '</form>' +
+      '<div class="form-foot">' +
+      '<button type="button" class="btn-link small" id="pnr-btn">' + OT.icon('train', 14) + ' ' + OT.esc(t('home.havePnr', 'I already have a ticket → import PNR (simulated)')) + '</button>' +
+      '<a class="small" href="https://www.irctc.co.in/" target="_blank" rel="noopener">' + OT.esc(t('home.irctc', 'Continue to IRCTC ticketing')) + ' ↗</a>' +
+      '</div></div>' +
       '</div>' +
       '<div class="track" aria-hidden="true"></div>' +
       '</section>' +
-
+      '<div id="for-you-slot"></div>' +
       '<section class="container how" aria-labelledby="how-h">' +
       '<h2 id="how-h">' + OT.esc(t('how.title', 'How OneTrip works')) + '</h2>' +
       '<ol class="how-steps">' +
-      [['globe', 'how.1', 'Choose your language', 'how.1d', '11 Indian languages, typed or spoken.'],
+      [['train', 'how.0', 'Find and book your train', 'how.0d', 'Any route, any date: simulated timetable, fares and availability.'],
         ['mic', 'how.2', 'Speak or type your trip', 'how.2d', 'Source, destination, date and budget.'],
         ['shield', 'how.3', 'Agents research and verify', 'how.3d', 'Every price re-checked at source, with time stamps.'],
         ['hotel', 'how.4', 'Pick hotel, cab, food', 'how.4d', 'Compare prices, policies and ratings.'],
         ['route', 'how.5', 'Manage it in My Journey', 'how.5d', 'One timeline, readiness score, bookings and refunds.']]
         .map(function (s, i) { return '<li><span class="how-n">' + (i + 1) + '</span>' + OT.icon(s[0], 22) + '<strong>' + OT.esc(t(s[1], s[2])) + '</strong><span class="small muted">' + OT.esc(t(s[3], s[4])) + '</span></li>'; }).join('') +
       '</ol></section>' +
-
       '<section class="container scen" aria-labelledby="scen-h">' +
       '<div class="row between"><h2 id="scen-h">' + OT.esc(t('scen.title', 'Sample journeys')) + '</h2>' + OT.simTag() + '</div>' +
       '<div class="grid grid-3">' +
       ['CDG', 'MDU', 'PURI'].map(function (code) {
-        var s2 = D().scenarios[code], tr = D().trains[s2.trainNo], L = OT.i18n.lang();
-        var nat = OT.lang.info(s2.lang).native;
+        var s2 = D().scenarios[code], tr = D().trains[s2.trainNo];
         return '<button type="button" class="scen-card card-flat" data-scen="' + code + '">' +
-          '<span class="scen-lang">' + OT.esc(nat) + '</span>' +
-          '<strong>' + OT.esc(D().stationName(s2.from, L)) + ' → ' + OT.esc(D().stationName(code, L)) + '</strong>' +
+          '<span class="scen-lang">' + OT.esc(OT.lang.info(s2.lang).native) + '</span>' +
+          '<strong>' + OT.esc(D().stationName(s2.from, L())) + ' → ' + OT.esc(D().stationName(code, L())) + '</strong>' +
           '<span class="small muted"><bdi class="keep">' + tr.no + '</bdi> ' + OT.esc(tr.name) + ' · <bdi class="keep">' + tr.dep + '</bdi>→<bdi class="keep">' + tr.arr + '</bdi></span>' +
           '<span class="small">' + OT.esc(t('scen.pax', '{n} travellers · budget {b}/night', { n: s2.passengers, b: OT.inr(s2.budget) })) + '</span>' +
           '</button>';
-      }).join('') +
-      '</div></section>';
+      }).join('') + '</div></section>';
 
-    bind(el, q);
+    bind(el);
     cycleBoard(to);
-    if (st) preview(st);
+    if (OT.forYou) OT.forYou.render(el.querySelector('#for-you-slot'), { place: 'home' });
+    if (draft) preview(draft);
     if (q.voice === '1') setTimeout(function () { startVoice(); }, 150);
-  }
-
-  function setBoard(code) {
-    var slot = root && root.querySelector('[data-board-slot]');
-    if (!slot) return;
-    slot.innerHTML = boardHTML(code);
-    cycleBoard(code);
   }
 
   function status(html, kind) {
@@ -172,59 +180,131 @@
     s.innerHTML = html || '';
   }
 
-  /** Live parse preview + form sync (shows what the agents understood). */
+  /** Live parse preview + sync the train form (shows what the agents understood). */
   function preview(text) {
     var box = root && root.querySelector('#parse-preview');
-    if (!box) return;
+    if (!box) return null;
     if (!String(text || '').trim()) { box.innerHTML = ''; return null; }
-    var det = OT.lang.detect(text), it = OT.agents.parseQuery(text);
-    var chips = ['<span class="pp-chip pp-lang">' + OT.icon('globe', 12) + ' ' + OT.esc(OT.lang.info(det.code).native) + ' · ' + Math.round(det.confidence * 100) + '%</span>'];
-    if (it.to) chips.push('<span class="pp-chip">' + OT.icon('pin', 12) + ' ' + OT.esc(D().stationName(it.to, OT.i18n.lang())) + ' <bdi class="keep">' + it.to + '</bdi></span>');
-    if (it.budget) chips.push('<span class="pp-chip">' + OT.icon('rupee', 12) + ' <bdi class="keep">' + OT.esc(OT.inr(it.budget)) + '</bdi></span>');
-    it.types.forEach(function (ty) { chips.push('<span class="pp-chip">' + OT.icon(ty, 12) + ' ' + OT.esc(OT.t('tabs.' + ty, ty)) + '</span>'); });
-    if (it.nearStation) chips.push('<span class="pp-chip">' + OT.icon('train', 12) + ' ' + OT.esc(OT.t('pref.near', 'Near station')) + '</span>');
-    box.innerHTML = '<span class="xs muted">' + OT.esc(OT.t('search.understood', 'Understood:')) + '</span> ' + chips.join('');
-    // sync the form so the traveller sees the effect
-    var f = root.querySelector('#trip-form');
-    if (it.to && f) { f.querySelector('#f-to').value = it.to; f.querySelector('#f-from').value = D().scenarios[it.to].from; setBoard(it.to); }
-    if (it.budget && f) f.querySelector('#f-budget').value = it.budget;
-    if (it.nearStation && f) { var b = f.querySelector('[data-pref="nearStation"]'); if (b) b.setAttribute('aria-pressed', 'true'); }
-    if (it.prefs.veg && f) { var v = f.querySelector('[data-pref="veg"]'); if (v) v.setAttribute('aria-pressed', 'true'); }
-    // transliteration suggestion for romanised input
+    var det = OT.lang.detect(text), cmd = OT.agents.parseCommand(text), it = OT.agents.parseQuery(text);
+    var budget = cmd.intent === 'hotel' ? it.budget : null;
+    box.innerHTML = '<span class="xs muted">' + OT.esc(t('search.understood', 'Understood:')) + '</span> <span class="pp-chip pp-lang">' + OT.icon('globe', 12) + ' ' + OT.esc(OT.lang.info(det.code).native) + ' · ' + Math.round(det.confidence * 100) + '%</span>' +
+      OT.trains.heardChips(cmd, { budget: budget }) + (cmd.intent === 'hotel' && cmd.to ? ' <bdi class="keep xs muted">' + cmd.to + '</bdi>' : '');
+    if (cmd.from) OT.trains.setCode(root, 'tf-from', cmd.from);
+    if (cmd.to) { OT.trains.setCode(root, 'tf-to', cmd.to); setBoard(cmd.to); }
+    if (cmd.date) { var di = root.querySelector('#tf-date'); if (di) di.value = cmd.date; }
+    if (cmd.cls) { var ci = root.querySelector('#tf-cls'); if (ci) ci.value = cmd.cls; }
+    if (cmd.pax) { var pi = root.querySelector('#tf-pax'); if (pi) pi.value = String(cmd.pax); }
+    if (budget) { var bi = root.querySelector('#f-budget'); if (bi) bi.value = budget; }
+    if (it.nearStation) { var b = root.querySelector('[data-pref="nearStation"]'); if (b) b.setAttribute('aria-pressed', 'true'); }
+    if (it.prefs.veg) { var v = root.querySelector('[data-pref="veg"]'); if (v) v.setAttribute('aria-pressed', 'true'); }
     var tl = root.querySelector('#translit');
     if (tl) {
-      var lang = OT.i18n.lang() === 'en' ? (det.romanised ? 'hi' : null) : OT.i18n.lang();
+      var lang = det.romanised ? 'hi' : (det.code === 'en' ? null : L());
       var r = lang && /[A-Za-z]{3,}/.test(text) ? OT.lang.transliterate(text, lang) : null;
       if (r && r.changed && r.text !== text) {
         tl.classList.remove('hidden');
-        tl.innerHTML = OT.icon('edit', 14) + ' <span class="xs muted">' + OT.esc(OT.t('search.translit', 'Transliteration:')) + '</span> <button type="button" class="btn-link" data-translit lang="' + lang + '">' + OT.esc(r.text) + '</button>';
+        tl.innerHTML = OT.icon('edit', 14) + ' <span class="xs muted">' + OT.esc(t('search.translit', 'Transliteration:')) + '</span> <button type="button" class="btn-link" data-translit lang="' + lang + '">' + OT.esc(r.text) + '</button>';
         tl.querySelector('[data-translit]').addEventListener('click', function () {
           var ta = root.querySelector('#ask-input'); ta.value = r.text; OT.state.homeDraft = r.text; tl.classList.add('hidden'); preview(r.text);
         });
       } else { tl.classList.add('hidden'); tl.innerHTML = ''; }
     }
-    return it;
+    return cmd;
+  }
+
+  function readStay() {
+    var prefs = {};
+    OT.$$('[data-pref]', root).forEach(function (b) { if (b.getAttribute('aria-pressed') === 'true') prefs[b.getAttribute('data-pref')] = true; });
+    var budget = +(root.querySelector('#f-budget') || {}).value || 3000;
+    OT.state.stay = { budget: budget, prefs: prefs };
+    return OT.state.stay;
+  }
+
+  /** Route a spoken/typed command. Always answers visibly; never silent. Returns a Promise. */
+  function handleCommand(text, opts) {
+    opts = opts || {};
+    if (!root) return Promise.resolve(null);
+    text = String(text || '').trim();
+    if (!text) { status(OT.icon('info', 14) + ' ' + OT.esc(t('cmd.empty', 'Type or say where you want to go, e.g. “train from Delhi to Jaipur on Friday”.')), 'warn'); return Promise.resolve(null); }
+    var cmd = preview(text) || OT.agents.parseCommand(text);
+    var heard = '<strong>' + OT.esc(t('cmd.heard', 'I heard')) + ':</strong> “' + OT.lang.highlight(text) + '”';
+    var name = function (c) { return D().stationName(c, L()); };
+    clearTimeout(navTimer);
+    if (cmd.intent === 'train') {
+      if (cmd.missing.length) {
+        var miss = cmd.missing.indexOf('from') >= 0 && cmd.missing.indexOf('to') >= 0 ? t('cmd.missBoth', 'Which stations? Say “from Chandigarh to Mumbai” or pick From and To above.')
+          : cmd.missing.indexOf('from') >= 0 ? t('cmd.missFrom', 'Train to {to}: from which station? Pick “From” above or say “from Chandigarh to {to}”.', { to: name(cmd.to) })
+            : t('cmd.missTo', 'Train from {from}: where to? Pick “To” above or say the destination.', { from: name(cmd.from) });
+        status(heard + '<br>' + OT.icon('info', 14) + ' ' + OT.esc(miss), 'warn');
+        var f = root.querySelector(cmd.missing.indexOf('from') >= 0 ? '#tf-from' : '#tf-to'); if (f && !opts.noFocus) f.focus();
+        return Promise.resolve(cmd);
+      }
+      var date = cmd.date || OT.trains.tomorrow();
+      status(heard + '<br>' + OT.icon('train', 14) + ' ' + OT.esc(t('cmd.goTrains', 'Searching trains {from} → {to} on {date}…', { from: name(cmd.from), to: name(cmd.to), date: OT.fmtDate(date) })), 'ok');
+      var path = OT.trains.path({ from: cmd.from, to: cmd.to, date: date, cls: cmd.cls || '', pax: cmd.pax || (root.querySelector('#tf-pax') || {}).value, heard: text });
+      return new Promise(function (res) { navTimer = setTimeout(function () { OT.go(path); res(cmd); }, opts.delay != null ? opts.delay : 700); });
+    }
+    if (['hotel', 'cab', 'food', 'sight'].indexOf(cmd.intent) >= 0) {
+      if (!cmd.to) { status(heard + '<br>' + OT.icon('info', 14) + ' ' + OT.esc(t('cmd.missCity', 'Which city? Say for example “hotel near Chandigarh station”.')), 'warn'); return Promise.resolve(cmd); }
+      status(heard + '<br>' + OT.icon('search', 14) + ' ' + OT.esc(t('cmd.goStay', 'Asking the agents about {what} in {city}…', { what: t('tabs.' + cmd.intent, cmd.intent), city: name(cmd.to) })), 'ok');
+      return planStay(cmd.to, text, cmd.intent).then(function () { return cmd; });
+    }
+    if (['refund', 'cancel', 'status', 'pnr', 'human'].indexOf(cmd.intent) >= 0 && OT.assistant) {
+      status(heard + '<br>' + OT.icon('chat', 14) + ' ' + OT.esc(t('cmd.goAsst', 'Opening the assistant for that…')), 'ok');
+      OT.assistant.open(); OT.assistant.ask(text, { intent: cmd.intent });
+      return Promise.resolve(cmd);
+    }
+    status(heard + '<br>' + OT.icon('info', 14) + ' ' + OT.esc(t('cmd.unknownLong', 'I couldn’t tell where you want to go or what you need. Try “train from Delhi to Jaipur on Friday”, “hotel near Chandigarh station” or “where is my refund?”.')), 'warn');
+    return Promise.resolve(cmd);
+  }
+
+  function planStay(to, text, intent) {
+    var stay = readStay();
+    var j = OT.store.get('journey');
+    var it = OT.agents.parseQuery(text);
+    var same = j && j.train && (j.scenario === to || j.train.to === to);
+    var p = Promise.resolve(true);
+    if (j && !same && (j.items || []).some(function (i) { return i.status !== 'cancelled'; })) {
+      p = OT.confirmAction({
+        title: t('search.replaceTitle', 'Start a new trip?'),
+        lines: [OT.esc(t('search.replaceLine', 'Your current trip to {city} has {n} item(s). Starting a new trip keeps your bookings but replaces the plan.', {
+          city: D().stationName(j.train.to, L()), n: j.items.filter(function (i) { return i.status !== 'cancelled'; }).length }))],
+        confirmLabel: t('search.replaceOk', 'Start new trip')
+      });
+    }
+    return p.then(function (ok) {
+      if (!ok) return false;
+      var budget = it.budget || stay.budget;
+      if (same) OT.store.update('journey', function (cur) { cur.budget = budget; cur.prefs = Object.assign({}, cur.prefs, stay.prefs); return cur; });
+      else {
+        var nj = D().scenarios[to] ? D().makeJourney(to, { budget: budget, prefs: stay.prefs }) : D().plannedJourney(to, { budget: budget, prefs: stay.prefs });
+        OT.store.set('journey', nj);
+      }
+      OT.state.homeDraft = text;
+      OT.state.resTab = intent && intent !== 'hotel' ? intent : 'hotel';
+      OT.go('results?to=' + encodeURIComponent(to) + (text ? '&q=' + encodeURIComponent(text) : ''));
+      return true;
+    });
   }
 
   function micBtn() { return root && root.querySelector('#home-mic'); }
-
   function startVoice() {
     if (!root) return;
     var ta = root.querySelector('#ask-input'), btn = micBtn();
     if (rec) { rec.stop(); rec = null; return; }
-    var lang = OT.i18n.lang();
-    status(OT.icon('mic', 14) + ' ' + OT.esc(OT.t('voice.listening', 'Listening… speak in {lang}', { lang: OT.lang.info(lang).native })), 'live');
+    var lang = L();
+    status(OT.icon('mic', 14) + ' ' + OT.esc(t('voice.listening', 'Listening… speak in {lang}', { lang: OT.lang.info(lang).native })), 'live');
     if (btn) btn.classList.add('listening');
     rec = OT.lang.listen({
       lang: lang,
       onInterim: function (txt) { ta.value = txt; },
       onResult: function (txt, conf) {
         ta.value = txt; OT.state.homeDraft = txt;
-        status(OT.icon('checkCircle', 14) + ' ' + OT.esc(OT.t('voice.heard', 'Transcribed (ASR confidence {c}%)', { c: Math.round(conf * 100) })), 'ok');
-        preview(txt);
+        status(OT.icon('checkCircle', 14) + ' ' + OT.esc(t('voice.heard', 'Transcribed (ASR confidence {c}%)', { c: Math.round(conf * 100) })), 'ok');
+        handleCommand(txt);
       },
       onError: function (e) {
-        status(OT.icon('info', 14) + ' ' + OT.esc(e.message) + ' <button type="button" class="btn-link" data-sample-inline="' + (OT.lang.samples[lang] ? lang : 'hi') + '">' + OT.esc(OT.t('voice.trySample', 'Try a sample voice query')) + '</button>', 'warn');
+        status(OT.icon('info', 14) + ' ' + OT.esc(e.message) + ' <button type="button" class="btn-link" data-sample-inline="' + (OT.lang.samples[lang] ? lang : 'hi') + '">' + OT.esc(t('voice.trySample', 'Try a sample voice query')) + '</button>', 'warn');
         var sb = root.querySelector('[data-sample-inline]');
         if (sb) sb.addEventListener('click', function () { sample(sb.getAttribute('data-sample-inline')); });
       },
@@ -233,140 +313,92 @@
     if (!rec && btn) btn.classList.remove('listening');
   }
 
-  /** Scripted sample voice query, typed out as if transcribed. */
-  function sample(lang) {
+  /** Scripted sample voice query, typed out as if transcribed (hi = the brief's hotel sentence, en = train). */
+  function sample(lang, text) {
     if (!root) return Promise.resolve();
     var ta = root.querySelector('#ask-input'), btn = micBtn();
-    var text = OT.lang.samples[lang] || OT.lang.samples.hi;
-    if (OT.i18n.lang() !== lang && lang !== 'en' && OT.i18n.lang() === 'en') { /* keep UI language; the agents detect the query language */ }
+    text = text || (lang === 'en' ? SAMPLE_EN : (OT.lang.samples[lang] || OT.lang.samples.hi));
     if (btn) btn.classList.add('listening');
-    status(OT.icon('mic', 14) + ' ' + OT.esc(OT.t('voice.simulating', 'Sample voice query (simulated ASR, {lang})…', { lang: OT.lang.info(lang).native })), 'live');
+    status(OT.icon('mic', 14) + ' ' + OT.esc(t('voice.simulating', 'Sample voice query (simulated ASR, {lang})…', { lang: OT.lang.info(lang).native })), 'live');
     ta.value = '';
     return OT.lang.simulateVoice(text, {
-      wordMs: 120,
+      wordMs: 110,
       onInterim: function (s) { ta.value = s; },
       onResult: function (s, c) {
+        if (!root) return;
         ta.value = s; OT.state.homeDraft = s;
         if (btn) btn.classList.remove('listening');
-        status(OT.icon('checkCircle', 14) + ' ' + OT.esc(OT.t('voice.heardSim', 'Transcribed by simulated ASR (confidence {c}%)', { c: Math.round(c * 100) })), 'ok');
+        status(OT.icon('checkCircle', 14) + ' ' + OT.esc(t('voice.heardSim', 'Transcribed by simulated ASR (confidence {c}%)', { c: Math.round(c * 100) })), 'ok');
         preview(s);
       }
     });
   }
 
-  function readForm() {
-    var f = root.querySelector('#trip-form');
-    var prefs = {};
-    OT.$$('[data-pref]', f).forEach(function (b) { if (b.getAttribute('aria-pressed') === 'true') prefs[b.getAttribute('data-pref')] = true; });
-    return {
-      from: f.querySelector('#f-from').value, to: f.querySelector('#f-to').value, date: f.querySelector('#f-date').value,
-      passengers: +f.querySelector('#f-pax').value, budget: +f.querySelector('#f-budget').value, prefs: prefs,
-      q: f.querySelector('#ask-input').value.trim()
-    };
-  }
-
-  function showError(msg) {
-    var e = root.querySelector('#form-error');
-    if (!e) return;
-    if (!msg) { e.classList.add('hidden'); e.textContent = ''; return; }
-    e.classList.remove('hidden'); e.textContent = msg;
-  }
-
-  function submit() {
-    if (!root) return Promise.resolve(false);
-    var v = readForm();
-    if (v.q) { var it = OT.agents.parseQuery(v.q); if (it.to) { v.to = it.to; v.from = D().scenarios[it.to].from; } if (it.budget) v.budget = it.budget; }
-    var sc = D().scenarios[v.to];
-    if (!sc || sc.from !== v.from) {
-      showError(OT.t('search.noTrain', 'No sample train for this pair. Try New Delhi → Chandigarh, Chennai → Madurai or Howrah → Puri.'));
-      return Promise.resolve(false);
-    }
-    if (!v.date) { showError(OT.t('search.noDate', 'Please choose a travel date.')); return Promise.resolve(false); }
-    if (!(v.budget >= 500)) { showError(OT.t('search.badBudget', 'Please enter a hotel budget of at least ₹500.')); return Promise.resolve(false); }
-    showError('');
-    var j = OT.store.get('journey');
-    var same = j && j.scenario === v.to && j.train.date === v.date;
-    var p = Promise.resolve(true);
-    if (j && !same && (j.items || []).some(function (i) { return i.status !== 'cancelled'; })) {
-      p = OT.confirmAction({
-        title: OT.t('search.replaceTitle', 'Start a new trip?'),
-        lines: [OT.esc(OT.t('search.replaceLine', 'Your current trip to {city} has {n} item(s). Starting a new trip keeps your bookings but replaces the plan.', {
-          city: D().stationName(j.train.to, OT.i18n.lang()), n: j.items.filter(function (i) { return i.status !== 'cancelled'; }).length }))],
-        confirmLabel: OT.t('search.replaceOk', 'Start new trip')
-      });
-    }
-    return p.then(function (ok) {
-      if (!ok) return false;
-      if (same) {
-        OT.store.update('journey', function (cur) { cur.budget = v.budget; cur.prefs = v.prefs; cur.passengers = v.passengers; return cur; });
-      } else {
-        OT.store.set('journey', D().makeJourney(v.to, { date: v.date, passengers: v.passengers, budget: v.budget, prefs: v.prefs }));
-      }
-      OT.state.homeDraft = v.q;
-      var qs = 'results?to=' + encodeURIComponent(v.to) + (v.q ? '&q=' + encodeURIComponent(v.q) : '');
-      OT.go(qs);
-      return true;
-    });
+  function submitTrains() {
+    var f = OT.trains.codeOf(root, 'tf-from'), to = OT.trains.codeOf(root, 'tf-to'), date = root.querySelector('#tf-date').value, err = root.querySelector('#tf-err');
+    var msg = !f || !to ? t('trn.errPick', 'Pick a From and a To station from the list.') : f === to ? t('trn.errSame', 'From and To must be different stations.') : !date ? t('search.noDate', 'Please choose a travel date.') : OT.data.rail.daysTo(date) < 0 ? t('trn.errPast', 'That date is in the past. Pick today or a later date.') : '';
+    if (msg) { err.textContent = msg; err.classList.remove('hidden'); return false; }
+    err.classList.add('hidden');
+    readStay();
+    OT.go(OT.trains.path({ from: f, to: to, date: date, cls: root.querySelector('#tf-cls').value, pax: root.querySelector('#tf-pax').value }));
+    return true;
   }
 
   function pnrModal() {
-    var t = OT.t;
     OT.modal({
       title: t('pnr.title', 'Import train from PNR (simulated)'),
       body: '<p class="small muted">' + OT.esc(t('pnr.note', 'No live PNR lookup. Only these sample PNRs exist in the demo data:')) + '</p>' +
-        '<ul class="pnr-samples">' + ['CDG', 'MDU', 'PURI'].map(function (c) { var s = D().scenarios[c]; return '<li><button type="button" class="btn-link" data-pnr="' + s.pnr + '"><bdi class="keep">' + s.pnr + '</bdi></button> · ' + OT.esc(D().stationName(s.from, OT.i18n.lang())) + ' → ' + OT.esc(D().stationName(c, OT.i18n.lang())) + '</li>'; }).join('') + '</ul>' +
+        '<ul class="pnr-samples">' + ['CDG', 'MDU', 'PURI'].map(function (c) { var s = D().scenarios[c]; return '<li><button type="button" class="btn-link" data-pnr="' + s.pnr + '"><bdi class="keep">' + s.pnr + '</bdi></button> · ' + OT.esc(D().stationName(s.from, L())) + ' → ' + OT.esc(D().stationName(c, L())) + '</li>'; }).join('') + '</ul>' +
         '<div class="field"><label for="pnr-in">' + OT.esc(t('pnr.label', '10-digit PNR')) + '</label><input id="pnr-in" class="input mono-num" inputmode="numeric" maxlength="10" value="4521837690"></div>' +
         '<p class="small" id="pnr-msg" aria-live="polite"></p>',
-      onOpen: function (body) {
-        OT.$$('[data-pnr]', body).forEach(function (b) { b.addEventListener('click', function () { body.querySelector('#pnr-in').value = b.getAttribute('data-pnr'); }); });
-      },
+      onOpen: function (body) { OT.$$('[data-pnr]', body).forEach(function (b) { b.addEventListener('click', function () { body.querySelector('#pnr-in').value = b.getAttribute('data-pnr'); }); }); },
       actions: [
         { label: t('common.cancel', 'Cancel'), kind: 'ghost' },
         { label: t('pnr.fetch', 'Fetch (simulated)'), kind: 'primary', onClick: function (close) {
           var inp = document.getElementById('pnr-in'), msg = document.getElementById('pnr-msg');
-          var sc = D().findPnr(inp.value);
-          if (!/^\d{10}$/.test(inp.value.trim())) { msg.textContent = t('pnr.bad', 'Enter a 10-digit PNR.'); msg.className = 'small text-bad'; return; }
-          if (!sc) { msg.textContent = t('pnr.notFound', 'PNR not found in the sample data. Try 4521837690.'); msg.className = 'small text-bad'; return; }
+          var v = inp.value.trim();
+          if (!/^\d{10}$/.test(v)) { msg.textContent = t('pnr.bad', 'Enter a 10-digit PNR.'); msg.className = 'small text-bad'; return; }
+          var sc = D().findPnr(v);
+          var b = (OT.store.get('bookings', []) || []).filter(function (x) { return x.type === 'train' && x.pnr === v; })[0];
+          if (!sc && !b) { msg.textContent = t('pnr.notFound', 'PNR not found in the sample data. Try 4521837690.'); msg.className = 'small text-bad'; return; }
           msg.textContent = t('pnr.loading', 'Reading sample PNR…'); msg.className = 'small muted';
           OT.sleep(600).then(function () {
-            var j = D().makeJourney(sc.key, {});
+            var j = b ? D().journeyFromTicket(b.ticket) : D().makeJourney(sc.key, {});
             OT.store.set('journey', j);
             close();
             OT.toast(t('pnr.ok', 'Train {no} imported: {from} → {to} (sample)', { no: j.train.no, from: j.train.from, to: j.train.to }), 'success');
-            if (root && document.body.contains(root)) OT.router.render();
+            OT.go('journey');
           });
         } }
       ]
     });
   }
 
-  function bind(el, q) {
-    var f = el.querySelector('#trip-form');
+  function bind(el) {
     var ta = el.querySelector('#ask-input');
-    f.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
+    OT.trains.bindPicker(el, 'tf-from');
+    OT.trains.bindPicker(el, 'tf-to', function (code) { setBoard(code); });
+    el.querySelector('#tf-swap').addEventListener('click', function () { var a = OT.trains.codeOf(el, 'tf-from'), b = OT.trains.codeOf(el, 'tf-to'); OT.trains.setCode(el, 'tf-from', b); OT.trains.setCode(el, 'tf-to', a); setBoard(a); });
+    el.querySelector('#train-form').addEventListener('submit', function (e) { e.preventDefault(); submitTrains(); });
+    el.querySelector('#ask-form').addEventListener('submit', function (e) { e.preventDefault(); handleCommand(ta.value); });
     ta.addEventListener('input', OT.debounce(function () { OT.state.homeDraft = ta.value; preview(ta.value); }, 250));
-    ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
+    ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleCommand(ta.value); } });
     el.querySelector('#home-mic').addEventListener('click', startVoice);
     OT.$$('[data-sample]', el).forEach(function (b) { b.addEventListener('click', function () { sample(b.getAttribute('data-sample')); }); });
-    OT.$$('[data-pref]', el).forEach(function (b) { b.addEventListener('click', function () { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); }); });
-    f.querySelector('#f-to').addEventListener('change', function (e) {
-      var sc = D().scenarios[e.target.value];
-      f.querySelector('#f-from').value = sc.from;
-      f.querySelector('#f-budget').value = sc.budget;
-      setBoard(e.target.value); showError('');
-    });
-    f.querySelector('#f-from').addEventListener('change', function () { showError(''); });
+    OT.$$('[data-pref]', el).forEach(function (b) { b.addEventListener('click', function () { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); readStay(); }); });
+    var fb = el.querySelector('#f-budget'); if (fb) fb.addEventListener('change', readStay);
     el.querySelector('#pnr-btn').addEventListener('click', pnrModal);
     var sd = el.querySelector('[data-start-tour]'); if (sd) sd.addEventListener('click', function () { if (OT.tour) OT.tour.start(); });
     OT.$$('[data-scen]', el).forEach(function (b) {
       b.addEventListener('click', function () {
         var code = b.getAttribute('data-scen'), sc = D().scenarios[code];
-        f.querySelector('#f-to').value = code; f.querySelector('#f-from').value = sc.from; f.querySelector('#f-budget').value = sc.budget;
-        f.querySelector('#f-pax').value = sc.passengers;
-        OT.$$('[data-pref]', f).forEach(function (p) { p.setAttribute('aria-pressed', sc.prefs[p.getAttribute('data-pref')] ? 'true' : 'false'); });
+        OT.trains.setCode(el, 'tf-from', sc.from); OT.trains.setCode(el, 'tf-to', code);
+        el.querySelector('#tf-pax').value = String(sc.passengers);
+        el.querySelector('#f-budget').value = sc.budget;
+        OT.$$('[data-pref]', el).forEach(function (p) { p.setAttribute('aria-pressed', sc.prefs[p.getAttribute('data-pref')] ? 'true' : 'false'); });
         ta.value = ''; OT.state.homeDraft = ''; preview('');
-        setBoard(code); showError('');
-        f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setBoard(code);
+        el.querySelector('#trip-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
   }
@@ -375,9 +407,11 @@
     title: function () { return OT.t('nav.plan', 'Plan trip'); },
     section: 'home',
     render: render,
-    onLeave: function () { clearInterval(timer); if (rec) { rec.stop(); rec = null; } OT.lang && OT.lang.stopListening(); root = null; },
+    onLeave: function () { clearInterval(timer); clearTimeout(navTimer); if (rec) { rec.stop(); rec = null; } if (OT.lang) OT.lang.stopListening(); root = null; },
     startVoice: startVoice,
     sample: sample,
-    submit: submit
+    command: handleCommand,
+    /** v1 compatibility: submit the ask box (tour/tests). */
+    submit: function () { return root ? handleCommand(root.querySelector('#ask-input').value, { delay: 0 }) : Promise.resolve(null); }
   });
 })();
