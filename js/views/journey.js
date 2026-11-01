@@ -1,0 +1,300 @@
+/* IRCTC OneTrip — My Journey: Trip Readiness ring, railway route-line timeline, conflict flags,
+ * add/remove/retime items, consolidated itinerary, play itinerary aloud. (Builder A)
+ */
+(function () {
+  'use strict';
+  var OT = window.OT;
+  var D = function () { return OT.data.travel; };
+  var root = null;
+  function t(k, fb, v) { return OT.t(k, fb, v); }
+  function L() { return OT.i18n.lang(); }
+  function keep(v) { return OT.lang.keep(v); }
+  function tm(iso) { return iso ? String(iso).slice(11, 16) : ''; }
+
+  var PART_LABEL = {
+    ticket: ['ready.ticket', 'Train ticket'], stay: ['ready.stay', 'Stay'], transfer: ['ready.transfer', 'Station transfer'],
+    meal: ['ready.meal', 'Meal'], ret: ['ready.return', 'Return journey'], conflicts: ['ready.conflicts', 'Timing conflicts resolved']
+  };
+  var STATE_LABEL = {
+    booked: ['ready.s.booked', 'Booked'], planned: ['ready.s.planned', 'Planned (80%)'], confirm: ['ready.s.confirm', 'Needs confirmation (50%)'],
+    missing: ['ready.s.missing', 'Missing'], open: ['ready.s.open', 'Open conflict']
+  };
+
+  /* ---------------- Readiness ring ---------------- */
+  function ringHTML(score, from) {
+    var r = 52, c = 2 * Math.PI * r;
+    var off = c * (1 - score / 100), off0 = c * (1 - (from == null ? score : from) / 100);
+    var tone = score >= 80 ? 'ok' : score >= 50 ? 'mid' : 'low';
+    return '<div class="ring ring-' + tone + '" role="img" aria-label="' + OT.esc(t('ready.aria', 'Trip Readiness {s} percent', { s: score })) + '">' +
+      '<svg viewBox="0 0 120 120" width="132" height="132"><circle class="ring-bg" cx="60" cy="60" r="' + r + '"/>' +
+      '<circle class="ring-fg" cx="60" cy="60" r="' + r + '" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off0.toFixed(1) + '" data-to="' + off.toFixed(1) + '" transform="rotate(-90 60 60)"/></svg>' +
+      '<div class="ring-val"><strong data-count-from="' + (from == null ? score : from) + '" data-count-to="' + score + '">' + (from == null ? score : from) + '</strong><span>%</span></div></div>';
+  }
+  function animateRing(el) {
+    var fg = el.querySelector('.ring-fg'), num = el.querySelector('[data-count-to]');
+    if (!fg) return;
+    requestAnimationFrame(function () { requestAnimationFrame(function () { fg.style.strokeDashoffset = fg.getAttribute('data-to'); }); });
+    var a = +num.getAttribute('data-count-from'), b = +num.getAttribute('data-count-to');
+    if (a === b) return;
+    var t0 = performance.now();
+    (function step(now) {
+      var p = Math.min(1, (now - t0) / 800);
+      num.textContent = Math.round(a + (b - a) * p);
+      if (p < 1 && document.body.contains(num)) requestAnimationFrame(step);
+    })(t0);
+  }
+
+  function readinessHTML(j, rd, from) {
+    return '<div class="card readiness" data-tour="readiness"><div class="card-head"><h2 class="h3">' + OT.esc(t('ready.title', 'Trip Readiness')) + '</h2>' +
+      '<span class="xs muted">' + OT.esc(t('ready.formula', 'Weighted checklist')) + '</span></div>' +
+      '<div class="ready-wrap">' + ringHTML(rd.score, from) +
+      '<ul class="ready-list">' + rd.parts.map(function (p) {
+        var ic = p.state === 'booked' ? 'checkCircle' : p.state === 'missing' ? 'minus' : 'alert';
+        var cls = p.state === 'booked' ? 'ok' : p.state === 'planned' ? 'plan' : p.state === 'missing' ? 'miss' : 'warn';
+        var hint = '';
+        if (p.state === 'missing') {
+          if (p.id === 'ret') hint = '<button type="button" class="btn-link xs" data-link-return>' + OT.esc(t('ready.linkReturn', 'Link return PNR')) + '</button>';
+          else if (p.id !== 'ticket') hint = '<a class="xs" href="#/results?to=' + j.scenario + '" data-goto-tab="' + ({ stay: 'hotel', transfer: 'cab', meal: 'food' }[p.id] || 'hotel') + '">' + OT.esc(t('ready.add', 'Add')) + '</a>';
+        }
+        return '<li class="rl-' + cls + '">' + OT.icon(ic, 15) + '<span class="rl-name">' + OT.esc(t(PART_LABEL[p.id][0], PART_LABEL[p.id][1])) +
+          '<small>' + OT.esc(t(STATE_LABEL[p.state][0], STATE_LABEL[p.state][1])) + '</small></span>' + hint +
+          '<span class="rl-pts"><bdi>' + (Math.round(p.pts * 10) / 10) + '</bdi>/' + p.w + '</span></li>';
+      }).join('') + '</ul></div>' +
+      '<p class="xs muted ready-note">' + OT.esc(t('ready.explain', 'Booked = full points, planned = 80%, needs confirmation = 50%. Weights: ticket 30, stay 25, transfer 20, meal 10, return 10, conflicts 5.')) + '</p></div>';
+  }
+
+  /* ---------------- Timeline (railway route line) ---------------- */
+  function fixesFor(c, j) {
+    var city = j.scenario, arrDate = j.train.arrDate || j.train.date, out = [];
+    var hotel = (j.items || []).filter(function (i) { return i.id === c.hotelItemId; })[0];
+    var hx = hotel && D().get(hotel.refId);
+    if (hx && hx.earlyCheckIn) out.push({ k: 'early', label: t('tl.fixEarly', 'Request early check-in (+{fee}, hotel must confirm)', { fee: OT.inr(hx.earlyCheckIn.fee) }) });
+    var cloak = D().byCity(city, 'sight').filter(function (x) { return x.service === 'cloakroom'; })[0];
+    if (cloak) out.push({ k: 'cloak', ref: cloak.id, label: t('tl.fixCloak', 'Leave bags at the station cloakroom ({fee}/bag)', { fee: OT.inr(cloak.price) }) });
+    var arrM = OT.agents.time.toMin(j.train.arr), ciM = OT.agents.time.toMin(hx ? hx.checkIn : '14:00');
+    var visit = D().byCity(city, 'sight').filter(function (x) {
+      if (x.service || x.day) return false; var m = OT.agents.time.toMin(x.slot); return m > arrM && m < ciM;
+    }).sort(function (a, b) { return (b.tags.indexOf('gapFill') >= 0) - (a.tags.indexOf('gapFill') >= 0); })[0];
+    if (visit) out.push({ k: 'visit', ref: visit.id, label: t('tl.fixVisit', 'Visit {name} in the gap', { name: visit.name }) });
+    return out;
+  }
+
+  function conflictHTML(c, j) {
+    if (c.kind === 'gap') {
+      var head = t('tl.conflict', 'Arrival {arr} vs check-in {checkin}: {gap} wait', { arr: c.arr, checkin: c.checkIn, gap: OT.agents.time.fmtGap(c.gapMin) });
+      if (c.resolved) {
+        var how = { early: t('tl.resEarly', 'early check-in requested (awaiting hotel confirmation)'), cloak: t('tl.resCloak', 'bags at the station cloakroom'), visit: t('tl.resVisit', 'a visit planned in the gap') }[c.how];
+        return '<div class="tl-conflict resolved" data-conflict="' + c.id + '">' + OT.icon('checkCircle', 18) + '<div><strong>' + OT.lang.highlight(head) + '</strong>' +
+          '<p class="small">' + OT.esc(t('tl.resolved', 'Resolved: {how}.', { how: how })) + '</p></div></div>';
+      }
+      return '<div class="tl-conflict" data-conflict="' + c.id + '" data-tour="conflict">' + OT.icon('alert', 18) + '<div><strong>' + OT.lang.highlight(head) + '</strong>' +
+        '<p class="small">' + OT.esc(t('tl.conflictWhy', 'Itinerary Agent: your train arrives before the hotel\'s standard check-in. Choose one:')) + '</p>' +
+        '<div class="fixes">' + fixesFor(c, j).map(function (f) { return '<button type="button" class="btn btn-ghost btn-sm" data-fix="' + f.k + '"' + (f.ref ? ' data-ref="' + f.ref + '"' : '') + '>' + OT.lang.highlight(f.label) + '</button>'; }).join('') + '</div></div></div>';
+    }
+    var msg = c.kind === 'cabEarly' ? t('tl.cabEarly', 'This pickup is before your train arrives. Change the time.') : t('tl.beforeArr', 'This is planned before your train arrives. Change the time.');
+    return '<div class="tl-conflict" data-conflict="' + c.id + '">' + OT.icon('alert', 18) + '<div><strong>' + OT.esc(msg) + '</strong></div></div>';
+  }
+
+  function nodeHTML(e, j, conflictsAfter) {
+    var it = e.item, isStation = !!e.station;
+    var badge = '';
+    if (it) {
+      badge = OT.badge(it.status === 'confirmed' ? 'confirmed' : 'pending', it.status === 'confirmed' ? null : t('status.selected', 'Planned')) +
+        (it.verification && it.verification !== 'verified' ? ' ' + OT.badge(it.verification) : ' ' + OT.badge('verified'));
+    } else if (e.kind === 'dep' || e.kind === 'arr') badge = OT.badge('confirmed', t('status.cnf', 'CNF')) + ' ' + OT.simTag(t('tl.sampleTiming', 'SAMPLE TIMING'));
+    else if (e.kind === 'rdep' || e.kind === 'rarr') badge = OT.badge('confirmed', t('status.cnf', 'CNF')) + ' ' + OT.simTag();
+    var actions = '';
+    if (it && e.kind !== 'checkout') {
+      var x = D().get(it.refId) || {};
+      actions = '<div class="tl-actions">' +
+        (it.status === 'selected' && e.kind !== 'stop' ? '<label class="tl-time"><span class="sr-only">' + OT.esc(t('tl.changeTime', 'Change time')) + '</span><input type="time" class="input input-sm" value="' + tm(e.kind === 'checkin' ? it.when : it.when) + '" data-retime="' + it.id + '"' + (e.kind === 'checkin' ? ' disabled title="' + OT.esc(t('tl.fixedCheckin', 'Check-in time is set by the hotel')) + '"' : '') + '></label>' : '') +
+        (it.status === 'selected' ? '<button type="button" class="btn btn-link small" data-remove-item="' + it.id + '">' + OT.icon('trash', 14) + ' ' + OT.esc(t('common.remove', 'Remove')) + '</button>' : '') +
+        (it.bookingRef ? '<span class="xs muted">' + OT.esc(t('tl.ref', 'Ref')) + ' ' + keep(it.bookingRef) + '</span>' : '') +
+        '<span class="xs muted">' + keep(OT.inr(it.price)) + (x.basis ? ' ' + OT.esc({ night: t('res.perNight', 'per night'), person: t('res.perPerson', 'per person'), trip: t('res.perTrip', 'per trip'), bag: t('res.perBag', 'per bag/day') }[x.basis]) : '') + '</span>' +
+        '</div>';
+    }
+    return '<li class="tl-row k-' + e.kind + (e.seg ? ' seg-' + e.seg : '') + (isStation ? ' is-station' : '') + '" data-ev="' + OT.esc(e.id) + '">' +
+      '<div class="tl-rail"><span class="tl-node">' + (isStation ? '<bdi class="keep">' + OT.esc(e.station) + '</bdi>' : OT.icon(e.icon, 14)) + '</span></div>' +
+      '<div class="tl-card">' +
+      '<div class="tl-when">' + (e.when ? keep(tm(e.when)) + ' <span class="xs muted">' + keep(OT.fmtDate(e.when)) + '</span>' : '<span class="muted xs">' + OT.esc(t('tl.noTime', 'Time not set')) + '</span>') + '</div>' +
+      '<div class="tl-main"><strong>' + OT.lang.highlight(e.title) + '</strong>' + (e.sub ? '<span class="small muted">' + OT.lang.highlight(e.sub) + '</span>' : '') + '</div>' +
+      '<div class="tl-badges">' + badge + '</div>' + actions +
+      '</div></li>' +
+      conflictsAfter.map(function (c) { return '<li class="tl-row tl-conf-row seg-local"><div class="tl-rail"></div><div class="tl-card-c">' + conflictHTML(c, j) + '</div></li>'; }).join('');
+  }
+
+  function timelineHTML(j) {
+    var it = OT.agents.itinerary(j);
+    var byAfter = {};
+    it.conflicts.forEach(function (c) {
+      var key = c.after === 'arr' ? 'arr' : c.after;
+      (byAfter[key] = byAfter[key] || []).push(c);
+    });
+    var rows = it.events.map(function (e) {
+      var after = (byAfter[e.id] || []).concat(e.itemId && e.kind !== 'checkin' && e.kind !== 'checkout' ? (byAfter[e.itemId] || []) : []);
+      return nodeHTML(e, j, after);
+    }).join('');
+    var ghost = j.returnTrain ? '' :
+      '<li class="tl-row tl-ghost"><div class="tl-rail"><span class="tl-node">' + OT.icon('plus', 14) + '</span></div><div class="tl-card">' +
+      '<div class="tl-main"><strong>' + OT.esc(t('tl.noReturn', 'Return journey not linked')) + '</strong><span class="small muted">' +
+      OT.lang.highlight(t('tl.returnHint', 'Sample return: {no} {name}, {date} {dep} (PNR {pnr})', { no: j.returnOption.no, name: j.returnOption.name, date: OT.fmtDate(j.returnOption.date), dep: j.returnOption.dep, pnr: j.returnOption.pnr })) + '</span></div>' +
+      '<div class="tl-actions"><button type="button" class="btn btn-ghost btn-sm" data-link-return>' + OT.icon('train', 14) + OT.esc(t('ready.linkReturn', 'Link return PNR')) + '</button></div></div></li>';
+    return '<div class="card timeline-card" data-tour="timeline"><div class="card-head"><h2 class="h3">' + OT.icon('route', 18) + ' ' + OT.esc(t('tl.title', 'Journey timeline')) + '</h2>' +
+      '<div class="tl-legend xs"><span class="lg-train"></span>' + OT.esc(t('tl.legendTrain', 'Train')) + '<span class="lg-local"></span>' + OT.esc(t('tl.legendLocal', 'Local')) + '</div></div>' +
+      '<ol class="tl">' + rows + ghost + '</ol></div>';
+  }
+
+  function tripHTML(j) {
+    var tr = j.train, lang = L();
+    return '<div class="ticket card" data-tour="ticket">' +
+      '<div class="ticket-main">' +
+      '<div class="ticket-train"><span class="xs muted">' + OT.esc(t('trip.train', 'Train')) + '</span><strong>' + keep(tr.no) + ' ' + OT.esc(tr.name) + '</strong></div>' +
+      '<div class="ticket-route">' +
+      '<div><span class="tk-code">' + keep(tr.from) + '</span><span class="small">' + OT.esc(D().stationName(tr.from, lang)) + '</span><span class="tk-time">' + keep(tr.dep) + '</span></div>' +
+      '<div class="tk-line" aria-hidden="true"><span></span>' + OT.icon('train', 16) + '<span></span></div>' +
+      '<div class="tk-r"><span class="tk-code">' + keep(tr.to) + '</span><span class="small">' + OT.esc(D().stationName(tr.to, lang)) + '</span><span class="tk-time">' + keep(tr.arr) + '</span></div>' +
+      '</div></div>' +
+      '<dl class="ticket-meta small">' +
+      '<div><dt>PNR</dt><dd>' + keep(j.pnr) + '</dd></div>' +
+      '<div><dt>' + OT.esc(t('trip.date', 'Date')) + '</dt><dd>' + keep(OT.fmtDate(tr.date)) + '</dd></div>' +
+      '<div><dt>' + OT.esc(t('trip.class', 'Class')) + '</dt><dd>' + keep(tr.cls) + '</dd></div>' +
+      '<div><dt>' + OT.esc(t('trip.seats', 'Coach / seats')) + '</dt><dd>' + keep(tr.coach) + ' · ' + keep(tr.seats.join(', ')) + '</dd></div>' +
+      '<div><dt>' + OT.esc(t('trip.status', 'Status')) + '</dt><dd>' + OT.badge('confirmed', t('status.cnf', 'CNF')) + '</dd></div>' +
+      '</dl>' +
+      '<p class="xs muted ticket-note">' + OT.icon('info', 12) + ' ' + OT.esc(t('trip.note', 'Sample ticket, booked on IRCTC. OneTrip never re-books or re-charges your train.')) +
+      ' <a href="https://www.irctc.co.in/" target="_blank" rel="noopener">' + OT.esc(t('home.irctc', 'Continue to IRCTC ticketing')) + ' ↗</a></p></div>';
+  }
+
+  function costHTML(j) {
+    var items = (j.items || []).filter(function (i) { return i.status !== 'cancelled'; });
+    var unpaid = items.filter(function (i) { return i.status === 'selected'; });
+    var tot = items.reduce(function (s, i) { return s + OT.agents.lineFor(i, j).amount; }, 0);
+    var due = unpaid.reduce(function (s, i) { return s + OT.agents.lineFor(i, j).amount; }, 0);
+    return '<div class="card cost"><div class="card-head"><h2 class="h3">' + OT.esc(t('journey.cost', 'Trip cost')) + '</h2>' + OT.simTag() + '</div>' +
+      '<div class="cost-rows small">' +
+      '<div><span>' + OT.esc(t('journey.ticketPaid', 'Train ticket (paid on IRCTC)')) + '</span>' + keep(OT.inr(j.train.fare)) + '</div>' +
+      '<div><span>' + OT.esc(t('journey.services', 'OneTrip services ({n})', { n: items.length })) + '</span>' + keep(OT.inr(tot)) + '</div>' +
+      '<div class="due"><span>' + OT.esc(t('journey.due', 'To pay now')) + '</span><strong>' + keep(OT.inr(due)) + '</strong></div></div>' +
+      (unpaid.length ? '<a class="btn btn-primary btn-block" href="#/checkout" data-tour="to-checkout">' + OT.icon('wallet', 17) + OT.esc(t('journey.checkout', 'Review & pay ({n})', { n: unpaid.length })) + '</a>'
+        : items.length ? '<a class="btn btn-ghost btn-block" href="#/bookings">' + OT.esc(t('nav.bookings', 'Bookings & refunds')) + '</a>' : '') +
+      '<a class="btn btn-ghost btn-block mt8" href="#/results?to=' + j.scenario + '">' + OT.icon('plus', 16) + OT.esc(t('journey.addMore', 'Add hotel, cab, food or sights')) + '</a></div>';
+  }
+
+  function emptyHTML() {
+    return '<div class="container page"><div class="card empty-state journey-empty">' + OT.icon('route', 40) +
+      '<h1 class="h2">' + OT.esc(t('journey.emptyTitle', 'No journey yet')) + '</h1>' +
+      '<p class="muted">' + OT.esc(t('journey.empty', 'Plan a trip around your train: tell us where you are going, or load the sample trip to see how it works.')) + '</p>' +
+      '<div class="row-wrap center"><a class="btn btn-primary" href="#/home">' + OT.icon('search', 16) + OT.esc(t('nav.plan', 'Plan trip')) + '</a>' +
+      '<button type="button" class="btn btn-ghost" id="load-sample">' + OT.icon('train', 16) + OT.esc(t('journey.loadSample', 'Load sample trip (New Delhi → Chandigarh)')) + '</button></div></div></div>';
+  }
+
+  /* ---------------- actions ---------------- */
+  function save(fn) { OT.store.update('journey', function (j) { fn(j); return j; }); if (root) render(root); }
+  function fix(kind, ref) {
+    var j = OT.store.get('journey'); if (!j) return;
+    var c = OT.agents.itinerary(j).conflicts.filter(function (x) { return x.kind === 'gap' && !x.resolved; })[0];
+    if (!c) return;
+    if (kind === 'early') {
+      save(function (jj) { jj.items.forEach(function (i) { if (i.id === c.hotelItemId) { i.earlyCheckIn = true; i.earlyTime = OT.agents.time.fromMin(OT.agents.time.toMin(jj.train.arr) + 30); } }); });
+      OT.toast(t('tl.earlyToast', 'Early check-in requested. The hotel must confirm; we will show it as pending.'), 'info');
+      return;
+    }
+    var fl = fixesFor(c, j).filter(function (f) { return f.k === kind; })[0];
+    ref = ref || (fl && fl.ref);
+    var x = D().get(ref); if (!x) return;
+    var slot = OT.agents.slotFor(x, j);
+    if (kind === 'cloak') slot.when = OT.agents.time.addMinIso((j.train.arrDate || j.train.date) + 'T' + j.train.arr, 10);
+    save(function (jj) {
+      jj.items.push({ id: OT.uid('IT'), type: x.type, refId: x.id, partnerId: x.partnerId, title: x.name, provider: x.provider, price: x.price, listedPrice: x.price,
+        when: slot.when, endWhen: slot.endWhen, status: 'selected', verification: OT.agents.verifyOne(x).verdict, city: x.city, addedAt: new Date().toISOString(), priceAccepted: true, fixFor: c.id });
+    });
+    OT.toast(t('tl.fixedToast', 'Conflict resolved: {name} added to your timeline.', { name: x.name }), 'success');
+  }
+  function linkReturn() {
+    var j = OT.store.get('journey'); if (!j) return;
+    save(function (jj) { jj.returnTrain = JSON.parse(JSON.stringify(jj.returnOption)); jj.returnTrain.status = 'CNF'; });
+    OT.toast(t('tl.returnToast', 'Return train {no} linked (sample PNR {pnr}).', { no: j.returnOption.no, pnr: j.returnOption.pnr }), 'success');
+  }
+  function playAloud() {
+    var j = OT.store.get('journey'); if (!j) return;
+    var it = OT.agents.itinerary(j);
+    var text = t('tl.speakIntro', 'Your journey on {date}.', { date: OT.fmtDate(j.train.date) }) + ' ' +
+      it.events.map(function (e) { return (e.when ? tm(e.when) + ', ' : '') + e.title + '.'; }).join(' ') +
+      (it.conflicts.some(function (c) { return !c.resolved; }) ? ' ' + t('tl.speakConflict', 'There is a timing conflict to resolve.') : '');
+    OT.lang.speak(text, L());
+  }
+  function consolidated() {
+    var j = OT.store.get('journey'); if (!j) return;
+    var it = OT.agents.itinerary(j), tr = j.train;
+    var rows = it.events.map(function (e) {
+      var i = e.item, x = i && D().get(i.refId);
+      return '<tr><td class="nowrap">' + (e.when ? keep(OT.fmtDate(e.when)) + ' ' + keep(tm(e.when)) : '—') + '</td><td>' + OT.lang.highlight(e.title) + '</td>' +
+        '<td class="small">' + OT.esc(x ? x.provider : (e.kind.indexOf('dep') >= 0 || e.kind.indexOf('arr') >= 0 ? 'Indian Railways / IRCTC' : '')) + '</td>' +
+        '<td>' + (i ? OT.badge(i.status === 'confirmed' ? 'confirmed' : 'pending', i.status === 'confirmed' ? null : t('status.selected', 'Planned')) : OT.badge('confirmed', t('status.cnf', 'CNF'))) + '</td>' +
+        '<td class="small">' + (i && i.bookingRef ? keep(i.bookingRef) : (e.kind === 'dep' || e.kind === 'arr' ? 'PNR ' + keep(j.pnr) : '')) + '</td></tr>';
+    }).join('');
+    OT.modal({
+      title: t('journey.itinTitle', 'Consolidated itinerary'), wide: true,
+      body: '<p class="small muted">' + OT.lang.highlight(t('journey.itinSub', '{no} {name} · {from} → {to} · {date} · {n} travellers (sample data)', { no: tr.no, name: tr.name, from: tr.from, to: tr.to, date: OT.fmtDate(tr.date), n: j.passengers })) + '</p>' +
+        '<div class="table-wrap"><table class="table"><thead><tr><th>' + OT.esc(t('itin.when', 'When')) + '</th><th>' + OT.esc(t('itin.what', 'What')) + '</th><th>' + OT.esc(t('itin.provider', 'Provider')) + '</th><th>' + OT.esc(t('itin.status', 'Status')) + '</th><th>' + OT.esc(t('itin.ref', 'Ref')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>',
+      actions: [{ label: t('journey.print', 'Print'), kind: 'ghost', onClick: function () { window.print(); } }, { label: t('common.close', 'Close'), kind: 'primary' }]
+    });
+  }
+
+  function render(el) {
+    root = el;
+    var j = OT.store.get('journey');
+    if (!j || !j.train) {
+      el.innerHTML = emptyHTML();
+      el.querySelector('#load-sample').addEventListener('click', function () { OT.store.set('journey', D().makeJourney('CDG', {})); render(el); });
+      return;
+    }
+    var rd = OT.agents.readiness(j);
+    var from = OT.state.lastReadiness != null && OT.state.lastReadinessJ === j.id ? OT.state.lastReadiness : null;
+    OT.state.lastReadiness = rd.score; OT.state.lastReadinessJ = j.id;
+    var tr = j.train;
+    el.innerHTML = '<div class="container page journey-page">' +
+      '<div class="page-head"><div><p class="eyebrow">' + OT.icon('route', 14) + ' ' + OT.esc(t('journey.eyebrow', 'One journey. One dashboard.')) + '</p>' +
+      '<h1>' + OT.esc(t('journey.title', 'My Journey')) + ': ' + OT.esc(D().stationName(tr.from, L())) + ' → ' + OT.esc(D().stationName(tr.to, L())) + '</h1>' +
+      '<p>' + OT.lang.highlight(t('journey.sub', '{date} · {n} travellers · hotel budget {b}/night', { date: OT.fmtDate(tr.date), n: j.passengers, b: OT.inr(j.budget) })) + '</p></div>' +
+      '<div class="row-wrap"><button type="button" class="btn btn-ghost btn-sm" id="j-play">' + OT.icon('speaker', 16) + OT.esc(t('tl.play', 'Play itinerary aloud')) + '</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" id="j-itin">' + OT.icon('layers', 16) + OT.esc(t('journey.itinBtn', 'Consolidated itinerary')) + '</button></div></div>' +
+      tripHTML(j) +
+      '<div class="journey-grid"><div class="j-side">' + readinessHTML(j, rd, from) + costHTML(j) + '</div>' +
+      '<div class="j-main">' + timelineHTML(j) + '</div></div></div>';
+    animateRing(el.querySelector('.ring'));
+    bind(el);
+  }
+
+  function bind(el) {
+    el.querySelector('#j-play').addEventListener('click', playAloud);
+    el.querySelector('#j-itin').addEventListener('click', consolidated);
+    OT.$$('[data-fix]', el).forEach(function (b) { b.addEventListener('click', function () { fix(b.getAttribute('data-fix'), b.getAttribute('data-ref')); }); });
+    OT.$$('[data-link-return]', el).forEach(function (b) { b.addEventListener('click', linkReturn); });
+    OT.$$('[data-goto-tab]', el).forEach(function (a) { a.addEventListener('click', function () { OT.state.resTab = a.getAttribute('data-goto-tab'); }); });
+    OT.$$('[data-remove-item]', el).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-remove-item');
+        save(function (j) { j.items = j.items.filter(function (i) { return i.id !== id; }); });
+        OT.toast(t('journey.removed', 'Removed from your journey.'), 'info');
+      });
+    });
+    OT.$$('[data-retime]', el).forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var id = inp.getAttribute('data-retime'), v = inp.value;
+        if (!/^\d{2}:\d{2}$/.test(v)) return;
+        save(function (j) { j.items.forEach(function (i) { if (i.id === id && i.when) { var dur = i.endWhen ? (OT.agents.time.isoMs(i.endWhen) - OT.agents.time.isoMs(i.when)) / 60000 : 0; i.when = i.when.slice(0, 11) + v; if (dur) i.endWhen = OT.agents.time.addMinIso(i.when, dur); } }); });
+      });
+    });
+  }
+
+  OT.registerView('journey', {
+    title: function () { return OT.t('nav.journey', 'My Journey'); },
+    section: 'journey',
+    render: function (el) { render(el); },
+    onLeave: function () { root = null; },
+    fix: fix,
+    linkReturn: linkReturn,
+    play: playAloud
+  });
+})();
