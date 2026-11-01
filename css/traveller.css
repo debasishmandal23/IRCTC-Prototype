@@ -300,6 +300,7 @@ bdi.keep { unicode-bidi: isolate; white-space: nowrap; font-variant-numeric: tab
 .co-ticket { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 12px; background: var(--blue-50); border: 1px solid var(--blue-100); border-radius: 10px; margin-bottom: 8px; }
 .co-ticket > .ic { color: var(--navy); }
 .co-ticket strong, .co-ticket span { display: block; }
+.co-ticket .badge { display: inline-flex; width: max-content; } .co-ticket .badge span { display: inline; }
 .co-lines { list-style: none; margin: 0; padding: 0; }
 .co-line { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line-2); }
 .co-line .offer-ic { width: 40px; height: 40px; }

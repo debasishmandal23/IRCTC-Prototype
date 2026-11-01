@@ -45,7 +45,7 @@
 
   function signedInHTML(u) {
     return '<div class="card signed"><div class="row">' + OT.icon('checkCircle', 26) + '<div><strong>' + OT.esc(t('auth.signedAs', 'Signed in as {name}', { name: u.name })) + '</strong>' +
-      '<div class="small muted">' + OT.esc(u.email) + ' · ' + OT.esc(t((ROLES[u.role] || ROLES.traveller).key, (ROLES[u.role] || ROLES.traveller).en)) + (u.partnerId ? ' · ' + u.partnerId : '') + '</div></div></div>' +
+      '<div class="small muted">' + OT.esc(u.email) + ' · ' + OT.esc(t((ROLES[u.role] || ROLES.traveller).key, (ROLES[u.role] || ROLES.traveller).en)) + (u.partnerId ? ' · ' + OT.esc(u.partnerId) : '') + '</div></div></div>' +
       '<div class="row-wrap mt12"><button type="button" class="btn btn-primary btn-sm" id="auth-continue">' + OT.esc(t('auth.continue', 'Continue')) + '</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" id="auth-logout">' + OT.icon('logout', 15) + OT.esc(t('auth.logout', 'Sign out')) + '</button></div></div>';
   }

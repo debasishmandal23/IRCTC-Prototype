@@ -280,10 +280,10 @@
         '<button class="btn btn-sm btn-ghost" data-act="delete" title="' + esc(t('common.delete', 'Delete')) + '" aria-label="' + esc(t('common.delete', 'Delete')) + ' ' + esc(l.title) + '">' + OT.icon('trash', 15) + '</button></div></article>';
     }).join('');
     var live = ls.filter(function (l) { return l.status === 'live'; }).length;
-    body.innerHTML = K.sec('', esc(t('partner.listSub', '{live} live of {n}. Prices you set here are what travellers see, with source “Partner extranet (simulated)” and a checked-at time.', { live: live, n: ls.length })),
+    body.innerHTML = K.sec('', esc(t('partner.listSub', '{live} live of {n}. In production, prices you set here are what travellers see, with source “Partner extranet” and a checked-at time.', { live: live, n: ls.length })),
       ls.length ? '<div class="listing-grid">' + cards + '</div>' : '<div class="pane empty-state">' + OT.icon('store', 28) + '<p>' + esc(t('partner.noListings', 'No listings yet.')) + '</p></div>',
       '<button class="btn btn-primary btn-sm" data-act="add">' + OT.icon('plus', 16) + esc(t('partner.addListing', 'Add listing')) + '</button>') +
-      K.simLine(t('partner.listSim', 'Listings are saved in this browser only (simulated partner extranet).'));
+      K.simLine(t('partner.listSim', 'Listings are saved in this browser only (simulated partner extranet). In this prototype the traveller results use the fixed sample catalogue.'));
   }
 
   function listingForm(l) {
@@ -376,7 +376,7 @@
         '<div class="row-wrap"><button class="btn btn-ghost btn-sm" data-act="cal-weekend">' + esc(t('partner.weekend', 'Fri–Sat +15%')) + '</button><button class="btn btn-ghost btn-sm" data-act="cal-reset">' + esc(t('partner.resetMonth', 'Reset month')) + '</button></div></div>' +
       '<div class="split"><div class="pane"><div class="cal">' + cells + '</div><div class="cal-legend"><span><i style="border-color:var(--saffron)"></i>' + esc(t('partner.custom', 'Custom price/availability')) + '</span><span><i style="background:repeating-linear-gradient(135deg,#F4F6FA 0 4px,#fff 4px 8px)"></i>' + esc(t('partner.closed', 'Closed')) + '</span><span><i style="box-shadow:inset 0 3px 0 var(--saffron)"></i>' + esc(t('partner.today', 'Today')) + '</span></div></div>' +
       '<div class="pane pane-wash">' + editor + '<div class="divider"></div><p class="small muted">' + OT.icon('target', 14) + ' ' + esc(t('partner.radarHint', 'Demand Radar: NDLS arrivals on 13–15 Nov are up 18%. Rates stay your decision; OneTrip never auto-prices.')) + '</p></div></div>') +
-      K.simLine(t('partner.priceSim', 'Calendar saved in this browser only (simulated extranet).'));
+      K.simLine(t('partner.priceSim', 'Calendar saved in this browser only (simulated extranet). Traveller results use the fixed sample catalogue in this prototype.'));
   }
   function updateCal(fn) {
     var ls = listings();
@@ -439,7 +439,13 @@
       var facts = listings().map(function (x) { return '- ' + x.title + ': ' + OT.inr(x.price) + ' per ' + x.unit + '; check-in ' + (x.checkin || 'n/a') + '; policy: ' + (x.policy || 'NOT SET'); }).join('\n');
       var prompt = 'Traveller enquiry (translated to English): "' + e.english + '"\nDates: ' + e.dates + '. Guests: ' + e.pax + '.\nListings (only source of prices/policies):\n' + facts + '\nWrite a short, warm reply in English from the front desk of Hotel Shivalik View (1.2 km from Chandigarh station CDG). Use ONLY the facts above for prices, times and policies; never invent numbers. Quote the cancellation policy verbatim. Plain text, under 120 words.';
       return OT.gemini.generate(prompt, { system: 'You are the Partner Agent of IRCTC OneTrip. You draft replies for a hotel partner who will review and confirm before sending.', timeoutMs: 12000, maxTokens: 400 })
-        .then(function (txt) { return { text: String(txt).trim(), by: 'Partner Agent (Gemini ' + OT.gemini.model() + ')' }; })
+        .then(function (txt) {
+          // guardrail: every ₹ amount in the draft must exist in the listing facts, else use the template
+          var nums = (String(txt).match(/₹\s?[\d,]+/g) || []).map(function (x) { return x.replace(/[₹,\s]/g, ''); });
+          var known = facts.replace(/,/g, '');
+          if (nums.some(function (n) { return known.indexOf(n) < 0; })) return { text: templateReply(e), by: 'Partner Agent (rules — AI draft had an unverified price)' };
+          return { text: String(txt).trim(), by: 'Partner Agent (Gemini ' + OT.gemini.model() + ')' };
+        })
         .catch(function () { return { text: templateReply(e), by: 'Partner Agent (rules — AI unavailable)' }; });
     }
     return Promise.resolve({ text: templateReply(e), by: 'Partner Agent (rules)' });

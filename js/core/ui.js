@@ -110,6 +110,7 @@
       OT.icon(kind === 'error' ? 'alert' : kind === 'success' ? 'checkCircle' : 'info', 18) +
       '<span>' + OT.esc(msg) + '</span></div>');
     root.appendChild(n);
+    while (root.children.length > 2) root.removeChild(root.firstElementChild); // keep at most 2 toasts on screen
     requestAnimationFrame(function () { n.classList.add('show'); });
     setTimeout(function () { n.classList.remove('show'); setTimeout(function () { n.remove(); }, 300); }, 3400);
   };
@@ -136,7 +137,10 @@
       foot.appendChild(b);
     });
     if (!(opts.actions || []).length) foot.remove();
+    var openedAt = Date.now();
     wrap.addEventListener('click', function (e) {
+      // ignore the 2nd click of a double-click on the button that opened this dialog
+      if (e.target === wrap && Date.now() - openedAt < 500) return;
       if (e.target === wrap || e.target.closest('[data-close]')) close();
     });
     document.addEventListener('keydown', onKey);

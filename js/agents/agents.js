@@ -573,12 +573,12 @@
       parking: 'नमस्ते {guest}, प्रति कमरा एक कार की निःशुल्क पार्किंग उपलब्ध है (जगह के अनुसार)।',
       avail: 'नमस्ते {guest}, {listing} के बारे में पूछताछ के लिए धन्यवाद। हमारे OneTrip कैलेंडर के अनुसार कमरे उपलब्ध हैं। आप सीधे OneTrip पर बुक कर सकते हैं।'
     }[topic];
-    function fill(s) {
-      return s.replace(/\{guest\}/g, guest).replace(/\{listing\}/g, listing).replace(/\{date\}/g, date || 'your date')
+    function fill(s, hiText) {
+      return s.replace(/\{guest\}/g, guest).replace(/\{listing\}/g, listing).replace(/\{date\}/g, date || (hiText ? 'आपकी तारीख' : 'your date'))
         .replace(/\{forDate\}/g, date ? ' for ' + date : '').replace(/\{forPax\}/g, pax ? ' for ' + pax + ' guests' : '');
     }
     var textEn = fill(en);
-    var out = { text: lang === 'hi' ? fill(hi) : textEn, textEn: textEn, lang: lang === 'hi' ? 'hi' : 'en', topic: topic, confidence: lang === 'hi' || lang === 'en' ? 0.9 : 0.6,
+    var out = { text: lang === 'hi' ? fill(hi, true) : textEn, textEn: textEn, lang: lang === 'hi' ? 'hi' : 'en', topic: topic, confidence: lang === 'hi' || lang === 'en' ? 0.9 : 0.6,
       agent: 'Partner Agent', note: 'Draft by Partner Agent (simulated). Review before sending; it never promises prices or availability not in your listing.' };
     if (lang !== 'hi' && lang !== 'en') out.note += ' Reply drafted in English: ' + (OT.lang ? OT.lang.info(lang).name : lang) + ' drafting needs live NMT.';
     out.toString = function () { return out.text; };

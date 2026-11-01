@@ -101,7 +101,8 @@
     OT.i18n.apply(document);
 
     var t = $('nav-toggle'), nav = $('main-nav');
-    if (t && nav) t.addEventListener('click', function () {
+    if (t && nav) t.addEventListener('click', function (e) {
+      e.stopPropagation(); // the icon is re-rendered below; the outside-click handler must not see a detached target
       var open = !nav.classList.contains('open');
       nav.classList.toggle('open', open);
       t.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -109,6 +110,7 @@
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
     document.addEventListener('click', function (e) {
+      if (!e.target.isConnected) return;
       if (nav && nav.classList.contains('open') && !e.target.closest('#main-nav') && !e.target.closest('#nav-toggle')) closeMenu();
     });
 
