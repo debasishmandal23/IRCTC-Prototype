@@ -329,7 +329,7 @@
     if (num) return Promise.resolve(openWa(num, m));
     return askWa(m);
   }
-  /* Small line under the share buttons: "WhatsApp to +91 90000 00210 · Change". */
+  /* Small line under the share buttons: "WhatsApp to +91 75898 02655 · Change". */
   function waNoteHTML() {
     var n = userMobile();
     return '<p class="xs muted wa-to" data-wa-note>' + (n

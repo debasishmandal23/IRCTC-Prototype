@@ -1210,7 +1210,7 @@ def v12_flow(browser, base, vp):
     n0 = len(pg.ev('() => window.__opened'))
     p.click('.itin-card [data-it="wa"]'); p.wait_for_timeout(250)
     opened = pg.ev('() => window.__opened')
-    check('signed in (Sunita): WhatsApp opens directly with the profile number +91 90000 00210', len(opened) == n0 + 1 and opened[-1].startswith('https://wa.me/919000000210?text=') and p.locator('.modal-backdrop.show').count() == 0, opened[-1:])
+    check('signed in (Sunita): WhatsApp opens directly with the profile number +91 75898 02655', len(opened) == n0 + 1 and opened[-1].startswith('https://wa.me/917589802655?text=') and p.locator('.modal-backdrop.show').count() == 0, opened[-1:])
     p.click('.itin-card [data-wa-change]'); p.wait_for_selector('.modal-backdrop.show #sh-to')
     check('"Change number" opens the prompt', p.locator('.modal-backdrop.show .wa-phone').count() == 1)
     p.locator('.modal-backdrop.show .modal-foot .btn').first.click(); p.wait_for_timeout(250)
