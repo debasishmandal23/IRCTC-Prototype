@@ -54,13 +54,16 @@
         var hint = '';
         if (p.state === 'missing') {
           if (p.id === 'ret') hint = '<button type="button" class="btn-link xs" data-link-return>' + OT.esc(t('ready.linkReturn', 'Link return PNR')) + '</button>';
+          else if (rd.trip && p.id === 'transfer') hint = '<a class="xs" href="#/transport?city=' + j.scenario + '&date=' + (j.start || '') + '">' + OT.esc(t('ready.add', 'Add')) + '</a>';
+          else if (rd.trip && p.id === 'meal') hint = '<a class="xs" href="#/food?city=' + j.scenario + '&date=' + (j.start || '') + '">' + OT.esc(t('ready.add', 'Add')) + '</a>';
           else if (p.id !== 'ticket') hint = '<a class="xs" href="#/results?to=' + j.scenario + '" data-goto-tab="' + ({ stay: 'hotel', transfer: 'cab', meal: 'food' }[p.id] || 'hotel') + '">' + OT.esc(t('ready.add', 'Add')) + '</a>';
         }
-        return '<li class="rl-' + cls + '">' + OT.icon(ic, 15) + '<span class="rl-name">' + OT.esc(t(PART_LABEL[p.id][0], PART_LABEL[p.id][1])) +
+        var pl = rd.trip && p.id === 'transfer' ? ['ready.local', 'Local transport'] : PART_LABEL[p.id];
+        return '<li class="rl-' + cls + '">' + OT.icon(ic, 15) + '<span class="rl-name">' + OT.esc(t(pl[0], pl[1])) +
           '<small>' + OT.esc(t(STATE_LABEL[p.state][0], STATE_LABEL[p.state][1])) + '</small></span>' + hint +
           '<span class="rl-pts"><bdi>' + (Math.round(p.pts * 10) / 10) + '</bdi>/' + p.w + '</span></li>';
       }).join('') + '</ul></div>' +
-      '<p class="xs muted ready-note">' + OT.esc(t('ready.explain', 'Booked = full points, planned = 80%, needs confirmation = 50%. Weights: ticket 30, stay 25, transfer 20, meal 10, return 10, conflicts 5.')) + '</p></div>';
+      '<p class="xs muted ready-note">' + OT.esc(rd.trip ? t('ready.explainTrip', 'No train in this trip, so readiness counts stay 42, local transport 33, meal 17 and conflicts 8 (booked = full points, planned = 80%, needs confirmation = 50%). Add a train any time.') : t('ready.explain', 'Booked = full points, planned = 80%, needs confirmation = 50%. Weights: ticket 30, stay 25, transfer 20, meal 10, return 10, conflicts 5.')) + '</p></div>';
   }
 
   /* ---------------- Timeline (railway route line) ---------------- */
@@ -134,6 +137,9 @@
       var after = (byAfter[e.id] || []).concat(e.itemId && e.kind !== 'checkin' && e.kind !== 'checkout' ? (byAfter[e.itemId] || []) : []);
       return nodeHTML(e, j, after);
     }).join('');
+    var addTrain = j.train ? '' : '<li class="tl-row tl-ghost tl-addtrain"><div class="tl-rail"><span class="tl-node">' + OT.icon('train', 14) + '</span></div><div class="tl-card">' +
+      '<div class="tl-main"><strong>' + OT.esc(t('trip.noTrain', 'No train in this trip yet')) + '</strong><span class="small muted">' + OT.esc(t('trip.noTrainSub', 'Coming by train? Add it and everything here is re-timed around the arrival.')) + '</span></div>' +
+      '<div class="tl-actions"><a class="btn btn-ghost btn-sm" href="#/' + addTrainPath(j) + '">' + OT.icon('plus', 14) + OT.esc(t('trip.addTrain', 'Add a train to this trip')) + '</a></div></div></li>';
     var ghost = j.returnTrain || !j.returnOption ? '' :
       '<li class="tl-row tl-ghost"><div class="tl-rail"><span class="tl-node">' + OT.icon('plus', 14) + '</span></div><div class="tl-card">' +
       '<div class="tl-main"><strong>' + OT.esc(t('tl.noReturn', 'Return journey not linked')) + '</strong><span class="small muted">' +
@@ -141,7 +147,7 @@
       '<div class="tl-actions"><button type="button" class="btn btn-ghost btn-sm" data-link-return>' + OT.icon('train', 14) + OT.esc(t('ready.linkReturn', 'Link return PNR')) + '</button></div></div></li>';
     return '<div class="card timeline-card" data-tour="timeline"><div class="card-head"><h2 class="h3">' + OT.icon('route', 18) + ' ' + OT.esc(t('tl.title', 'Journey timeline')) + '</h2>' +
       '<div class="tl-legend xs"><span class="lg-train"></span>' + OT.esc(t('tl.legendTrain', 'Train')) + '<span class="lg-local"></span>' + OT.esc(t('tl.legendLocal', 'Local')) + '</div></div>' +
-      '<ol class="tl">' + rows + ghost + '</ol></div>';
+      '<ol class="tl">' + addTrain + rows + ghost + '</ol>' + (!it.events.length ? '<p class="small muted">' + OT.esc(t('trip.emptyTl', 'Nothing booked yet. Add a hotel, local transport, food or sights.')) + '</p>' : '') + '</div>';
   }
 
   /** Ticket status badge: CNF / RAC / WL (+ chance) / PLANNED (not booked) / CANCELLED. */
@@ -152,7 +158,21 @@
     if (s === 'CANCELLED') return OT.badge('cancelled');
     return OT.badge('pending', s + (tr.chance != null ? ' · ' + t('trn.chance', '{p}% chance', { p: tr.chance }) : ''));
   }
+  function addTrainPath(j) {
+    var u = OT.store.get('user') || {}, from = u.homeCity && u.homeCity !== j.scenario ? u.homeCity : (j.scenario === 'NDLS' ? 'CSMT' : 'NDLS');
+    var d = j.start && OT.data.rail.daysTo(D().addDays(j.start, -1)) >= 0 ? D().addDays(j.start, -1) : OT.trains.tomorrow();
+    return OT.trains.path({ from: from, to: j.scenario, date: d, pax: j.passengers });
+  }
+  /** v1.2: a trip without a train (standalone bookings). */
+  function stayHTML(j) {
+    var city = D().stationName(j.scenario, L());
+    return '<div class="ticket card trip-card" data-tour="trip-card"><div class="ticket-main"><div class="ticket-train"><span class="xs muted">' + OT.esc(t('trip.kind', 'Trip')) + '</span><strong>' + OT.esc(OT.trip.title(j)) + '</strong></div>' +
+      '<div class="trip-dates">' + OT.icon('calendar', 16) + ' <bdi class="keep">' + OT.esc(OT.fmtDate(j.start)) + (j.end && j.end !== j.start ? ' – ' + OT.esc(OT.fmtDate(j.end)) : '') + '</bdi></div></div>' +
+      '<div class="trip-cta"><p class="small muted">' + OT.esc(t('trip.noTrainLong', 'Booked on its own, no train needed. Travelling to {city} by train? Add it and your stay, transport and meals line up with the arrival.', { city: city })) + '</p>' +
+      '<a class="btn btn-accent btn-sm" id="add-train" href="#/' + addTrainPath(j) + '">' + OT.icon('train', 15) + OT.esc(t('trip.addTrain', 'Add a train to this trip')) + '</a></div></div>';
+  }
   function tripHTML(j) {
+    if (!j.train) return stayHTML(j);
     var tr = j.train, lang = L();
     return '<div class="ticket card" data-tour="ticket">' +
       '<div class="ticket-main">' +
@@ -181,8 +201,8 @@
     var tot = items.reduce(function (s, i) { return s + OT.agents.lineFor(i, j).amount; }, 0);
     var due = unpaid.reduce(function (s, i) { return s + OT.agents.lineFor(i, j).amount; }, 0);
     return '<div class="card cost"><div class="card-head"><h2 class="h3">' + OT.esc(t('journey.cost', 'Trip cost')) + '</h2>' + OT.simTag() + '</div>' +
-      '<div class="cost-rows small">' +
-      (j.train.status === 'CANCELLED' ? '<div><span>' + OT.esc(t('journey.ticketCancelled', 'Train ticket (cancelled, refund as per railway rules)')) + '</span><s>' + keep(OT.inr(j.train.fare)) + '</s></div>'
+      '<div class="cost-rows small">' + (!j.train ? '' :
+      j.train.status === 'CANCELLED' ? '<div><span>' + OT.esc(t('journey.ticketCancelled', 'Train ticket (cancelled, refund as per railway rules)')) + '</span><s>' + keep(OT.inr(j.train.fare)) + '</s></div>'
         : '<div><span>' + OT.esc(t('journey.ticketPaid', 'Train ticket (paid on IRCTC)')) + '</span>' + keep(OT.inr(j.train.fare)) + '</div>') +
       '<div><span>' + OT.esc(t('journey.services', 'OneTrip services ({n})', { n: items.length })) + '</span>' + keep(OT.inr(tot)) + '</div>' +
       '<div class="due"><span>' + OT.esc(t('journey.due', 'To pay now')) + '</span><strong>' + keep(OT.inr(due)) + '</strong></div></div>' +
@@ -229,14 +249,14 @@
   function playAloud() {
     var j = OT.store.get('journey'); if (!j) return;
     var it = OT.agents.itinerary(j);
-    var text = t('tl.speakIntro', 'Your journey on {date}.', { date: OT.fmtDate(j.train.date) }) + ' ' +
+    var text = t('tl.speakIntro', 'Your journey on {date}.', { date: OT.fmtDate(j.train ? j.train.date : j.start) }) + ' ' +
       it.events.map(function (e) { return (e.when ? tm(e.when) + ', ' : '') + e.title + '.'; }).join(' ') +
       (it.conflicts.some(function (c) { return !c.resolved; }) ? ' ' + t('tl.speakConflict', 'There is a timing conflict to resolve.') : '');
     OT.lang.speak(text, L());
   }
   function consolidated() {
     var j = OT.store.get('journey'); if (!j) return;
-    var it = OT.agents.itinerary(j), tr = j.train;
+    var it = OT.agents.itinerary(j), tr = j.train || { no: '', name: OT.trip.title(j), from: j.scenario, to: j.scenario, date: j.start };
     var rows = it.events.map(function (e) {
       var i = e.item, x = i && D().get(i.refId);
       return '<tr><td class="nowrap">' + (e.when ? keep(OT.fmtDate(e.when)) + ' ' + keep(tm(e.when)) : '—') + '</td><td>' + OT.lang.highlight(e.title) + '</td>' +
@@ -255,7 +275,7 @@
   function render(el) {
     root = el;
     var j = OT.store.get('journey');
-    if (!j || !j.train) {
+    if (!j || (!j.train && j.kind !== 'trip')) {
       el.innerHTML = emptyHTML();
       el.querySelector('#load-sample').addEventListener('click', function () { OT.store.set('journey', D().makeJourney('CDG', {})); render(el); });
       return;
@@ -264,14 +284,17 @@
     var from = OT.state.lastReadiness != null && OT.state.lastReadinessJ === j.id ? OT.state.lastReadiness : null;
     OT.state.lastReadiness = rd.score; OT.state.lastReadinessJ = j.id;
     var tr = j.train;
+    var head = tr ? OT.esc(D().stationName(tr.from, L())) + ' → ' + OT.esc(D().stationName(tr.to, L())) : OT.esc(OT.trip.title(j));
+    var sub = tr ? t('journey.sub', '{date} · {n} travellers · hotel budget {b}/night', { date: OT.fmtDate(tr.date), n: j.passengers, b: OT.inr(j.budget) })
+      : t('journey.subTrip', '{date} · {n} travellers · hotel budget {b}/night', { date: OT.fmtDate(j.start) + (j.end && j.end !== j.start ? ' – ' + OT.fmtDate(j.end) : ''), n: j.passengers, b: OT.budget.text(j.budgetMin || OT.budget.MIN, j.budget || OT.budget.MAX) });
     el.innerHTML = '<div class="container page journey-page">' +
       '<div class="page-head"><div><p class="ot-eyebrow">' + OT.icon('route', 14) + ' ' + OT.esc(t('journey.eyebrow', 'One journey. One dashboard.')) + '</p>' +
-      '<h1>' + OT.esc(t('journey.title', 'My Journey')) + ': ' + OT.esc(D().stationName(tr.from, L())) + ' → ' + OT.esc(D().stationName(tr.to, L())) + '</h1>' +
-      '<p>' + OT.lang.highlight(t('journey.sub', '{date} · {n} travellers · hotel budget {b}/night', { date: OT.fmtDate(tr.date), n: j.passengers, b: OT.inr(j.budget) })) + '</p></div>' +
+      '<h1>' + OT.esc(t('journey.title', 'My Journey')) + ': ' + head + '</h1>' +
+      '<p>' + OT.lang.highlight(sub) + '</p></div>' +
       '<div class="row-wrap"><button type="button" class="btn btn-ghost btn-sm" id="j-play">' + OT.icon('speaker', 16) + OT.esc(t('tl.play', 'Play itinerary aloud')) + '</button>' +
       '<button type="button" class="btn btn-ghost btn-sm" id="j-itin">' + OT.icon('layers', 16) + OT.esc(t('journey.itinBtn', 'Consolidated itinerary')) + '</button></div></div>' +
       tripHTML(j) +
-      '<div class="journey-grid"><div class="j-side">' + readinessHTML(j, rd, from) + costHTML(j) + '</div>' +
+      '<div class="journey-grid"><div class="j-side">' + readinessHTML(j, rd, from) + costHTML(j) + (OT.itinerary ? OT.itinerary.cardHTML() : '') + '</div>' +
       '<div class="j-main">' + timelineHTML(j) + '</div></div></div><div id="fy-journey"></div>';
     animateRing(el.querySelector('.ring'));
     if (OT.forYou) OT.forYou.render(el.querySelector('#fy-journey'), { place: 'journey' });
@@ -279,6 +302,7 @@
   }
 
   function bind(el) {
+    if (OT.itinerary) OT.itinerary.bindCard(el);
     el.querySelector('#j-play').addEventListener('click', playAloud);
     el.querySelector('#j-itin').addEventListener('click', consolidated);
     OT.$$('[data-fix]', el).forEach(function (b) { b.addEventListener('click', function () { fix(b.getAttribute('data-fix'), b.getAttribute('data-ref')); }); });

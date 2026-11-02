@@ -154,7 +154,7 @@
       var tool = { hotel: 'hotel_search', cab: 'cab_search', food: 'food_search', sight: 'sight_search' }[ty];
       var args = { tool: tool, city: city, near: intent.nearStation ? city : undefined, date: intent.date };
       if (ty === 'hotel' && intent.budget) args.max_price = intent.budget;
-      var found = D().byCity(city, ty);
+      var found = D().byCity(city, ty).filter(function (x) { return !x.leg; }); // per-leg transport quotes are not catalogue listings
       found.forEach(function (x) {
         sources[x.source.name] = (sources[x.source.name] || 0) + 1;
         records.push({ item: x, checkedAt: x.source.checkedAt, source: x.source });
@@ -234,6 +234,7 @@
     verified.forEach(function (v) {
       if (v.verdict === 'unavailable') { hidden.push({ v: v, reason: 'soldout' }); return; }
       if (v.item.type === 'hotel' && intent.budget && v.item.price > intent.budget && v.livePrice > intent.budget) { filtered.push({ v: v, reason: 'budget' }); return; }
+      if (v.item.type === 'hotel' && intent.budgetMin && v.livePrice < intent.budgetMin) { filtered.push({ v: v, reason: 'budgetMin' }); return; }
       if (dismissed[v.item.id]) { filtered.push({ v: v, reason: 'dismissed' }); return; }
       v.score = score(v, intent); v.reasons = reasons(v, intent);
       byType[v.item.type].push(v);
@@ -253,6 +254,12 @@
 
   /* ---------------- Itinerary Agent ---------------- */
   OT.agents.slotFor = function (x, j) {
+    if (!j.train) {   // v1.2 trip without a train: anchor on the trip start date
+      var d0 = j.start || D().defaultDate();
+      if (x.type === 'hotel') return { when: dt(d0, x.checkIn || '12:00'), endWhen: dt(j.end && j.end > d0 ? j.end : D().addDays(d0, j.nights || 1), x.checkOut || '11:00') };
+      var dd = D().addDays(d0, x.day || 0);
+      return { when: dt(dd, x.slot || '10:00'), endWhen: x.durationMin ? addMinIso(dt(dd, x.slot || '10:00'), x.durationMin) : undefined };
+    }
     var tr = j.train, arrDate = tr.arrDate || tr.date, arrIso = dt(arrDate, tr.arr);
     if (x.type === 'hotel') {
       // late arrival (after the hotel's check-in time): check in ~45 min after the train arrives
@@ -271,7 +278,26 @@
 
   function activeItems(j) { return (j.items || []).filter(function (i) { return i.status !== 'cancelled'; }); }
 
+  /* v1.2: a trip without a train (standalone hotel / transport / food / sight bookings) */
+  function tripItinerary(j) {
+    var ev = [];
+    activeItems(j).forEach(function (it) {
+      var x = D().get(it.refId) || {};
+      if (it.type === 'hotel') {
+        ev.push({ id: it.id + '-in', kind: 'checkin', when: it.when || null, icon: 'hotel', seg: 'local', itemId: it.id, item: it,
+          title: T('tl.checkin', 'Check-in: {name}', { name: it.title }), sub: x.area || '' });
+        if (it.endWhen) ev.push({ id: it.id + '-out', kind: 'checkout', when: it.endWhen, icon: 'hotel', seg: 'local', itemId: it.id, item: it, title: T('tl.checkout', 'Check-out: {name}', { name: it.title }), sub: '' });
+        return;
+      }
+      var titles = { cab: x.mode ? T('tl.ride', 'Ride: {name}', { name: it.title }) : T('tl.pickup', 'Pickup: {name}', { name: it.title }), food: T('tl.meal', 'Meal: {name}', { name: it.title }), sight: T('tl.visit', 'Visit: {name}', { name: it.title }) };
+      ev.push({ id: it.id, kind: it.type, when: it.when || null, icon: OT.itemIcon ? OT.itemIcon(x, it.type) : it.type, seg: 'local', itemId: it.id, item: it, title: titles[it.type] || it.title, sub: x.meet || x.area || '', unknownTime: !it.when });
+    });
+    ev.sort(function (a, b) { if (!a.when) return 1; if (!b.when) return -1; return isoMs(a.when) - isoMs(b.when); });
+    if (ev.length) ev[ev.length - 1].seg = null;
+    return { events: ev, conflicts: [], trip: true };
+  }
   OT.agents.itinerary = function (j) {
+    if (j && !j.train && j.kind === 'trip') return tripItinerary(j);
     if (!j || !j.train) return { events: [], conflicts: [] };
     var tr = j.train, st = D().stations, L = OT.i18n ? OT.i18n.lang() : 'en';
     var arrDate = tr.arrDate || tr.date, arrIso = dt(arrDate, tr.arr), depIso = dt(tr.date, tr.dep);
@@ -299,8 +325,8 @@
           title: T('tl.checkout', 'Check-out: {name}', { name: it.title }), sub: '' });
         return;
       }
-      var titles = { cab: T('tl.pickup', 'Pickup: {name}', { name: it.title }), food: T('tl.meal', 'Meal: {name}', { name: it.title }), sight: x.service === 'cloakroom' ? T('tl.cloak', 'Drop bags: {name}', { name: it.title }) : T('tl.visit', 'Visit: {name}', { name: it.title }) };
-      ev.push({ id: it.id, kind: it.type, when: when, icon: it.type === 'sight' ? (x.service ? 'lock' : 'sight') : it.type, seg: 'local', itemId: it.id, item: it,
+      var titles = { cab: x.mode ? T('tl.ride', 'Ride: {name}', { name: it.title }) : T('tl.pickup', 'Pickup: {name}', { name: it.title }), food: T('tl.meal', 'Meal: {name}', { name: it.title }), sight: x.service === 'cloakroom' ? T('tl.cloak', 'Drop bags: {name}', { name: it.title }) : T('tl.visit', 'Visit: {name}', { name: it.title }) };
+      ev.push({ id: it.id, kind: it.type, when: when, icon: OT.itemIcon ? OT.itemIcon(x, it.type) : it.type, seg: 'local', itemId: it.id, item: it,
         title: titles[it.type] || it.title, sub: x.meet || x.area || '', unknownTime: !when });
     });
     if (j.returnTrain) {
@@ -368,6 +394,7 @@
   }
   OT.agents.readiness = function (j) {
     var W = OT.agents.READINESS_WEIGHTS, parts = [];
+    if (j && !j.train && j.kind === 'trip') return tripReadiness(j);
     if (!j || !j.train) return { score: 0, parts: [] };
     var items = activeItems(j);
     var tf = { CNF: 1, RAC: 0.5, WL: 0.25 }[j.train.status] || 0;
@@ -378,7 +405,7 @@
     }
     var stay = best(function (i) { return i.type === 'hotel'; });
     parts.push({ id: 'stay', w: W.stay, pts: W.stay * stay.f, state: stay.state });
-    var tr = best(function (i) { var x = D().get(i.refId); return i.type === 'cab' && x && x.offsetMin != null; });
+    var tr = best(function (i) { var x = D().get(i.refId); return i.type === 'cab' && x && x.offsetMin != null; });   // station transfer (cab, auto, metro, bus… from the station)
     parts.push({ id: 'transfer', w: W.transfer, pts: W.transfer * tr.f, state: tr.state });
     var meal = best(function (i) { return i.type === 'food'; });
     parts.push({ id: 'meal', w: W.meal, pts: W.meal * meal.f, state: meal.state });
@@ -389,10 +416,26 @@
     return { score: Math.min(100, score), parts: parts };
   };
 
+  /** Trip without a train: same checklist minus ticket and return, re-weighted to 100 (stay 42 · transfer 33 · meal 17 · conflicts 8). */
+  OT.agents.TRIP_WEIGHTS = { stay: 42, transfer: 33, meal: 17, conflicts: 8 };
+  function tripReadiness(j) {
+    var W = OT.agents.TRIP_WEIGHTS, items = activeItems(j), parts = [];
+    function best(filter) { var c = items.filter(filter).map(credit).sort(function (a, b) { return b.f - a.f; })[0]; return c || { f: 0, state: 'missing' }; }
+    var stay = best(function (i) { return i.type === 'hotel'; });
+    parts.push({ id: 'stay', w: W.stay, pts: W.stay * stay.f, state: stay.state });
+    var tr = best(function (i) { return i.type === 'cab'; });
+    parts.push({ id: 'transfer', w: W.transfer, pts: W.transfer * tr.f, state: tr.state });
+    var meal = best(function (i) { return i.type === 'food'; });
+    parts.push({ id: 'meal', w: W.meal, pts: W.meal * meal.f, state: meal.state });
+    parts.push({ id: 'conflicts', w: W.conflicts, pts: W.conflicts, state: 'booked', open: 0 });
+    var score = Math.round(parts.reduce(function (s, p) { return s + p.pts; }, 0));
+    return { score: Math.min(100, score), parts: parts, trip: true };
+  }
+
   /* ---------------- Pricing + refund helpers ---------------- */
   OT.agents.lineFor = function (it, j) {
-    var x = D().get(it.refId) || {}, pax = (j && j.passengers) || 1, qty = 1, unit = it.price;
-    if (x.basis === 'night') qty = (j && j.nights) || 1;
+    var x = D().get(it.refId) || {}, pax = it.pax || (j && j.passengers) || 1, qty = 1, unit = it.price;
+    if (x.basis === 'night') qty = (it.nights || (j && j.nights) || 1) * (it.rooms || 1);   // v1.2: standalone stays carry their own nights/rooms
     if (x.basis === 'person') qty = pax;
     if (x.basis === 'bag') qty = pax;
     var amount = unit * qty;

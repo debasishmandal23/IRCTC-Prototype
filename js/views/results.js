@@ -7,7 +7,8 @@
   var D = function () { return OT.data.travel; };
   var root = null, token = 0;
   var TYPES = ['hotel', 'cab', 'food', 'sight'];
-  var TAB_KEYS = { hotel: ['tabs.hotel', 'Hotels'], cab: ['tabs.cab', 'Cabs'], food: ['tabs.food', 'Food'], sight: ['tabs.sight', 'Sightseeing'] };
+  var TAB_KEYS = { hotel: ['tabs.hotel', 'Hotels'], cab: ['tabs.transport', 'Transport'], food: ['tabs.food', 'Food'], sight: ['tabs.sight', 'Sightseeing'] };
+  var TAB_ICON = { hotel: 'hotel', cab: 'bus', food: 'food', sight: 'sight' };
 
   function t(k, fb, v) { return OT.t(k, fb, v); }
   function line(l) { return OT.lang.highlight(t(l.key, l.en, l.vars)); }
@@ -82,8 +83,9 @@
       '</ul></details>';
   }
 
-  function cardHTML(v, run) {
-    var x = v.item, added = inJourney(x.id);
+  function cardHTML(v, run, opts) {
+    opts = opts || {};
+    var x = v.item, added = opts.standalone ? opts.added : inJourney(x.id);
     var priceChanged = v.livePrice !== x.price;
     var labels = [];
     labels.push(x.managed === 'irctc' ? '<span class="lbl lbl-irctc">' + OT.esc(t('res.irctc', 'IRCTC-managed')) + '</span>' : '<span class="lbl">' + OT.esc(t('res.partner', 'Partner offer')) + '</span>');
@@ -100,7 +102,7 @@
 
     return '<article class="offer' + (v.top ? ' is-top' : '') + '" data-ref="' + x.id + '" data-verdict="' + v.verdict + '">' +
       '<div class="offer-top">' +
-      '<span class="offer-ic">' + OT.icon(x.service ? 'lock' : x.type, 22) + '</span>' +
+      '<span class="offer-ic">' + OT.icon(OT.itemIcon(x), 22) + '</span>' +
       '<div class="offer-title"><h3>' + OT.esc(x.name) + '</h3><div class="offer-prov small">' + OT.esc(x.provider) + ' ' + labels.join(' ') + '</div></div>' +
       '<div class="offer-price"><div class="price"><bdi class="keep">' + OT.esc(x.price === 0 && v.livePrice === 0 ? t('res.free', 'Free') : OT.inr(v.livePrice)) + '</bdi></div>' +
       '<div class="xs muted">' + OT.esc(basisLabel(x.basis)) + ' · ' + OT.esc(t('res.inclTax', 'incl. GST')) + '</div>' + OT.simTag() + '</div>' +
@@ -118,11 +120,14 @@
       verifLog(v) +
       '<div class="source-line">' + OT.icon('info', 12) + '<span>' + OT.esc(t('res.source', 'Source')) + ': ' + OT.esc(x.source.name) + '</span><span><bdi class="keep">' + OT.esc(x.source.ref) + '</bdi></span>' +
       '<span>' + OT.esc(t('res.checked', 'checked')) + ' ' + OT.esc(OT.stamp(new Date(v.sourceCheckedAt))) + ' (' + OT.esc(OT.agents.time.agoLabel(v.sourceCheckedAt)) + ')</span></div>' +
+      (opts.standalone ? '<div class="offer-actions">' +
+        '<button type="button" class="btn btn-accent btn-sm" data-book-now="' + x.id + '">' + OT.icon('wallet', 15) + OT.esc(t('svc.bookNow', 'Book now')) + '</button>' +
+        (added ? '<span class="badge b-ok">' + OT.icon('check', 12) + '<span>' + OT.esc(t('svc.inTrip', 'In your trip')) + '</span></span>' : '<button type="button" class="btn btn-ghost btn-sm" data-add-trip="' + x.id + '">' + OT.icon('plus', 15) + OT.esc(t('svc.addTrip', 'Add to trip')) + '</button>') + '</div></article>' :
       '<div class="offer-actions">' +
       (added ? '<button type="button" class="btn btn-ghost btn-sm added" data-remove="' + x.id + '">' + OT.icon('check', 15) + OT.esc(t('res.added', 'Added')) + ' · ' + OT.esc(t('common.remove', 'Remove')) + '</button>'
         : '<button type="button" class="btn btn-primary btn-sm" data-add="' + x.id + '">' + OT.icon('plus', 15) + OT.esc(t('res.add', 'Add to journey')) + '</button>') +
       '<button type="button" class="btn btn-link small" data-dismiss="' + x.id + '">' + OT.esc(t('res.dismiss', 'Not for me')) + '</button>' +
-      '</div></article>';
+      '</div></article>');
   }
 
   function hiddenHTML(run, type) {
@@ -132,8 +137,8 @@
     return '<details class="hidden-list card-flat"><summary>' + OT.icon('eye', 15) + ' ' + OT.esc(t('res.hiddenTitle', 'Hidden or filtered by agents ({n})', { n: hid.length + fil.length })) + '</summary><ul>' +
       hid.map(function (h) { return '<li>' + OT.badge('unavailable') + ' <strong>' + OT.esc(h.v.item.name) + '</strong>: ' + OT.esc(t('res.hidSold', 'sold out at provider source (Verification Agent)')) + '</li>'; }).join('') +
       fil.map(function (h) {
-        var why = h.reason === 'budget' ? t('res.hidBudget', '{p} is over your {b} budget (Recommendation Agent)', { p: OT.inr(h.v.item.price), b: OT.inr(run.intent.budget) }) : t('res.hidDismissed', 'dismissed by you');
-        return '<li><span class="badge b-info">' + OT.icon('filter', 12) + '<span>' + OT.esc(h.reason === 'budget' ? t('res.filtered', 'Filtered') : t('res.dismissed', 'Dismissed')) + '</span></span> <strong>' + OT.esc(h.v.item.name) + '</strong>: ' + OT.lang.highlight(why) +
+        var why = h.reason === 'budget' ? t('res.hidBudget', '{p} is over your {b} budget (Recommendation Agent)', { p: OT.inr(h.v.item.price), b: OT.inr(run.intent.budget) }) : h.reason === 'budgetMin' ? t('res.hidBudgetMin', '{p} is below your minimum {b}', { p: OT.inr(h.v.livePrice), b: OT.inr(run.intent.budgetMin) }) : t('res.hidDismissed', 'dismissed by you');
+        return '<li><span class="badge b-info">' + OT.icon('filter', 12) + '<span>' + OT.esc(h.reason !== 'dismissed' ? t('res.filtered', 'Filtered') : t('res.dismissed', 'Dismissed')) + '</span></span> <strong>' + OT.esc(h.v.item.name) + '</strong>: ' + OT.lang.highlight(why) +
           (h.reason === 'dismissed' ? ' <button type="button" class="btn-link small" data-undismiss="' + h.v.item.id + '">' + OT.esc(t('res.undo', 'Undo')) + '</button>' : '') + '</li>';
       }).join('') + '</ul></details>';
   }
@@ -169,13 +174,30 @@
     var rec = run.rec.byType;
     return summaryHTML(run) +
       '<div class="tabs" role="tablist">' + TYPES.map(function (ty) {
-        return '<button type="button" role="tab" class="tab" data-tab="' + ty + '" aria-selected="' + (ty === tab) + '">' + OT.icon(ty, 15) + ' ' + OT.esc(t(TAB_KEYS[ty][0], TAB_KEYS[ty][1])) + ' <span class="tab-n">' + rec[ty].length + '</span></button>';
+        return '<button type="button" role="tab" class="tab" data-tab="' + ty + '" aria-selected="' + (ty === tab) + '">' + OT.icon(TAB_ICON[ty], 15) + ' ' + OT.esc(t(TAB_KEYS[ty][0], TAB_KEYS[ty][1])) + ' <span class="tab-n">' + rec[ty].length + '</span></button>';
       }).join('') + '</div>' +
       TYPES.map(function (ty) {
         return '<div class="tab-panel" role="tabpanel" data-panel="' + ty + '"' + (ty === tab ? '' : ' hidden') + '>' +
+          (ty === 'cab' ? legHTML(run) + (rec[ty].length ? '<h3 class="h4 tx-more">' + OT.icon('cab', 16) + ' ' + OT.esc(t('tx.moreCabs', 'More cab offers (day trips, transfers)')) + '</h3>' : '') : '') +
+          (ty === 'hotel' ? '<p class="xs muted bud-inline">' + OT.icon('rupee', 12) + ' ' + OT.esc(t('res.budgetShown', 'Showing hotels for {b} per night', { b: OT.budget.text(run.intent.budgetMin || OT.budget.MIN, run.intent.budget || OT.budget.MAX) })) + '</p>' : '') +
           (rec[ty].length ? rec[ty].map(function (v) { return cardHTML(v, run); }).join('') : '<p class="muted">' + OT.esc(t('res.none', 'No verified options in this category.')) + '</p>') +
           hiddenHTML(run, ty) + '</div>';
       }).join('');
+  }
+
+  /* Station → hotel leg: every local mode side by side (replaces "cabs only" in the journey flow). */
+  var lastLeg = null;
+  function legHTML(run) {
+    var j = OT.store.get('journey');
+    if (!j || !OT.transportUI || !OT.data.transport) return '';
+    var to = run.intent.to;
+    var hotel = (j.items || []).filter(function (i) { return i.type === 'hotel' && i.status !== 'cancelled'; })[0];
+    var top = run.rec.byType.hotel[0];
+    var ref = hotel ? hotel.refId : top && top.item.id;
+    var u = OT.store.get('user') || {}, per = u.personaId && OT.data.personas ? OT.data.personas.get(u.personaId) : null;
+    lastLeg = j.train ? OT.data.transport.stationLeg(to, ref, j, per || u) : OT.data.transport.compare({ city: to, from: 'stn:' + to, to: ref ? 'htl:' + ref : null, time: '12:00', pax: j.passengers, persona: per || u });
+    var sel = {}; (j.items || []).forEach(function (i) { if (i.status !== 'cancelled') sel[i.refId] = true; });
+    return OT.transportUI.html(lastLeg, { action: 'select', selected: sel, title: j.train ? t('tx.arrivalTitle', 'Station → hotel: compare every way to get there') : null });
   }
 
   function skeleton() {
@@ -200,9 +222,13 @@
         if (i.type === 'hotel' && i.status === 'selected') { replaced = i.title; return false; } return true;
       });
     }
+    if (x.legKey) {   // one mode per leg: picking the bus replaces a previously selected cab for the same leg
+      j.items = j.items.filter(function (i) { var y = D().get(i.refId); if (i.status === 'selected' && y && y.legKey === x.legKey) { replaced = i.title; return false; } return true; });
+    }
     var item = { id: OT.uid('IT'), type: x.type, refId: x.id, partnerId: x.partnerId, title: x.name, provider: x.provider, price: v.livePrice,
       listedPrice: x.price, when: slot.when, endWhen: slot.endWhen, status: 'selected', verification: v.verdict, city: x.city, addedAt: new Date().toISOString(),
       priceAccepted: v.livePrice === x.price };
+    if (x.leg && x.basis === 'person') item.pax = j.passengers;
     j.items.push(item);
     OT.store.set('journey', j);
     var r = OT.agents.readiness(j).score;
@@ -213,6 +239,16 @@
   function removeItem(refId) {
     OT.store.update('journey', function (j) { j.items = (j.items || []).filter(function (i) { return !(i.refId === refId && i.status === 'selected'); }); return j; });
     refresh();
+  }
+  /** Re-apply the visible budget range (no new agent run): recommend again and update "x of y hotels within budget". */
+  function applyBudget(run) {
+    var j = OT.store.get('journey') || {};
+    run.intent.budget = j.budget || OT.budget.MAX; run.intent.budgetMin = j.budgetMin || 0;
+    run.rec = OT.agents.recommend(run.verified, run.intent);
+    if (root) {
+      var avail = run.verified.filter(function (v) { return v.item.type === 'hotel' && v.verdict !== 'unavailable'; }).length;
+      OT.budget.count(root, 'rb', run.rec.byType.hotel.length, avail);
+    }
   }
   function refresh() {
     if (!root || !OT.state.lastRun) return;
@@ -261,6 +297,7 @@
         });
       });
     });
+    if (lastLeg && OT.transportUI) OT.transportUI.bind(main, lastLeg, function (o) { addItem(o.item.id); });
     var sp = root.querySelector('#speak-sum');
     if (sp) sp.addEventListener('click', function () { OT.lang.speak(OT.agents.summarize(OT.state.lastRun, L()), L()); });
   }
@@ -289,19 +326,23 @@
     var to = q.to || (j && j.scenario) || 'CDG';
     if (!D().stations[to]) to = 'CDG';
     if (D().ensureCity) D().ensureCity(to);
-    if (!j || !j.train || (j.scenario !== to && j.train.to !== to)) { j = D().scenarios[to] ? D().makeJourney(to, {}) : D().plannedJourney(to, {}); OT.store.set('journey', j); }
+    var isTrip = j && !j.train && j.kind === 'trip' && j.scenario === to;
+    if (!isTrip && (!j || !j.train || (j.scenario !== to && j.train.to !== to))) { j = D().scenarios[to] ? D().makeJourney(to, {}) : D().plannedJourney(to, {}); OT.store.set('journey', j); }
+    if (q.max || q.min) { OT.store.update('journey', function (x) { if (q.max) x.budget = +q.max; if (q.min) x.budgetMin = +q.min; return x; }); j = OT.store.get('journey'); }
     var lang = L();
     var query = q.q || t('search.autoQuery', 'Hotel, cab, food and sightseeing near {city} station within {budget}', { city: D().stationName(to, lang), budget: OT.inr(j.budget) });
-    var key = [query, to, j.budget, JSON.stringify(j.prefs)].join('|');
-    var tr = j.train;
+    var key = [query, to, JSON.stringify(j.prefs)].join('|');
+    var tr = j.train || { no: '', name: '', from: '', to: to, date: j.start || D().defaultDate(), status: 'NONE' };
 
     el.innerHTML = '<div class="container page results-page">' +
-      '<div class="page-head"><div><p class="ot-eyebrow">' + OT.icon('train', 14) + ' <bdi class="keep">' + tr.no + '</bdi> ' + OT.esc(tr.name) + ' · <bdi class="keep">' + tr.from + '</bdi> → <bdi class="keep">' + tr.to + '</bdi> · <bdi class="keep">' + OT.esc(OT.fmtDate(tr.date)) + '</bdi></p>' +
+      '<div class="page-head"><div><p class="ot-eyebrow">' + (j.train ? OT.icon('train', 14) + ' <bdi class="keep">' + tr.no + '</bdi> ' + OT.esc(tr.name) + ' · <bdi class="keep">' + tr.from + '</bdi> → <bdi class="keep">' + tr.to + '</bdi> · <bdi class="keep">' + OT.esc(OT.fmtDate(tr.date)) + '</bdi>'
+        : OT.icon('route', 14) + ' ' + OT.esc(OT.trip.title(j)) + ' · <bdi class="keep">' + OT.esc(OT.fmtDate(tr.date)) + '</bdi>') + '</p>' +
       '<h1>' + OT.esc(t('res.title', 'Verified options near {city}', { city: D().stationName(to, lang) })) + '</h1>' +
       '<p>' + OT.esc(t('res.sub', 'Every price and timing comes from a provider source with a check time. Nothing is invented.')) + '</p>' +
       (tr.status === 'PLANNED' ? '<p class="note note-warn small">' + OT.icon('train', 14) + ' ' + OT.esc(t('res.planned', 'Suggested train, not booked yet.')) + ' <a href="#/' + OT.trains.path({ from: tr.from, to: tr.to, date: tr.date, pax: j.passengers }) + '">' + OT.esc(t('res.bookTrain', 'Book the train first')) + '</a></p>' : '') + '</div>' +
       '<div class="row-wrap"><a class="btn btn-ghost btn-sm" href="#/home?to=' + to + '">' + OT.icon('edit', 15) + OT.esc(t('res.edit', 'Edit search')) + '</a>' +
       '<button type="button" class="btn btn-ghost btn-sm" id="rerun">' + OT.icon('refresh', 15) + OT.esc(t('res.rerun', 'Run agents again')) + '</button></div></div>' +
+      '<div class="card res-filter" id="res-filter">' + OT.budget.html({ id: 'rb', lo: j.budgetMin || OT.budget.MIN, hi: j.budget || OT.budget.MAX }) + '</div>' +
       '<div class="res-grid">' +
       '<aside class="trace-panel card" id="trace" aria-live="polite" data-tour="trace"></aside>' +
       '<section class="res-main" id="res-main">' + skeleton() + '</section>' +
@@ -310,9 +351,15 @@
 
     var traceEl = el.querySelector('#trace');
     el.querySelector('#rerun').addEventListener('click', function () { OT.state.lastRun = null; OT.router.render(); });
+    OT.budget.bind(el, 'rb', function (lo, hi) {
+      OT.store.update('journey', function (x) { if (x) { x.budget = hi; x.budgetMin = lo; } return x; });
+      var run = OT.state.lastRun;
+      if (run && run.done) { applyBudget(run); refresh(); }
+    });
 
     var cached = OT.state.lastRun;
     if (cached && cached.done && cached.key === key) {
+      applyBudget(cached);
       traceEl.innerHTML = traceHTML(cached, cached.steps, true);
       el.querySelector('#res-main').innerHTML = resultsHTML(cached);
       bindMain();
@@ -325,7 +372,7 @@
     traceEl.innerHTML = traceHTML({}, [], false);
     OT.agents.run(query, {
       lang: lang,
-      intent: { to: to, budget: j.budget, prefs: j.prefs, nearStation: !!(j.prefs && j.prefs.nearStation), date: tr.date }, train: j.train,
+      intent: { to: to, budget: j.budget, budgetMin: j.budgetMin, prefs: j.prefs, nearStation: !!(j.prefs && j.prefs.nearStation), date: tr.date }, train: j.train, trip: !j.train,
       onStep: function (s, steps) {
         if (my !== token || !root) return;
         traceEl.innerHTML = traceHTML({}, steps, false);
@@ -336,6 +383,7 @@
       run.key = key;
       OT.state.running = false;
       if (my !== token || !root) return;
+      applyBudget(run);
       traceEl.innerHTML = traceHTML(run, run.steps, true);
       el.querySelector('#res-main').innerHTML = resultsHTML(run);
       bindMain();
@@ -349,6 +397,8 @@
     });
   }
 
+  OT.resultsUI = { card: function (v, opts) { return cardHTML(v, null, opts); } };
+
   OT.registerView('results', {
     title: function () { return OT.t('res.titleShort', 'Recommendations'); },
     section: 'home',
@@ -356,6 +406,7 @@
     onLeave: function () { token++; root = null; OT.state.running = false; },
     add: addItem,
     tab: setTab,
+    applyBudget: applyBudget,
     refresh: refresh
   });
 })();

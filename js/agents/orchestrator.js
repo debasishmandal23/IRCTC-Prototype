@@ -180,9 +180,9 @@
       if (!tr || tr.to !== run.intent.to) tr = { no: '—', to: run.intent.to, arr: '12:00' };
       var top = run.rec.byType.hotel[0];
       return wait(450).then(function () {
-        var lines = [L('tr.itinTrain', 'Train {no} arrives {to} at {arr} (sample timing)', { no: tr.no, to: tr.to, arr: tr.arr })];
+        var lines = [opts.trip ? L('tr.itinTrip', 'No train in this trip: timings anchored on the trip dates; add a train any time') : L('tr.itinTrain', 'Train {no} arrives {to} at {arr} (sample timing)', { no: tr.no, to: tr.to, arr: tr.arr })];
         var status = 'done';
-        if (top) {
+        if (top && !opts.trip) {
           var gap = OT.agents.time.toMin(top.item.checkIn) - OT.agents.time.toMin(tr.arr);
           if (gap > 30) {
             status = 'warn';

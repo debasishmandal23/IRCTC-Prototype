@@ -1,4 +1,4 @@
-/* IRCTC OneTrip — app shell: header icons, language selector, nav highlight, mobile menu,
+/* IRCTC OneTrip — app shell: header icons, language selector, nav highlight, horizontal nav bar (v1.2, no hamburger),
  * i18n re-application and view re-render on language change. (Builder A)
  */
 (function () {
@@ -6,14 +6,15 @@
   var OT = window.OT;
   var shell = OT.shell = {};
 
-  var SECTION = { trains: 'trains', home: 'home', results: 'home', journey: 'journey', checkout: 'journey', bookings: 'bookings', login: 'login', register: 'login' };
+  var SECTION = { trains: 'trains', home: 'home', results: 'home', journey: 'journey', checkout: 'journey', 'itinerary-print': 'journey', bookings: 'bookings', login: 'login', register: 'login',
+    hotels: 'hotels', transport: 'transport', food: 'home', sights: 'home' };
+  var MORE = { partner: 1, admin: 1, insights: 1 };
 
   function $(id) { return document.getElementById(id); }
   function setIcon(id, name, size) { var el = $(id); if (el) el.innerHTML = OT.icon(name, size || 20); }
 
   function labels() {
     var map = {
-      'nav-toggle': ['aria-label', OT.t('hdr.menu', 'Open menu')],
       'hdr-mic': ['aria-label', OT.t('hdr.mic', 'Voice search')],
       'hdr-assistant': ['aria-label', OT.t('hdr.assistant', 'Open AI assistant')],
       'hdr-settings': ['aria-label', OT.t('hdr.settings', 'Settings')]
@@ -103,12 +104,27 @@
     el.querySelector('[data-offer-x]').addEventListener('click', function () { el.classList.remove('show'); });
   };
 
-  function closeMenu() {
-    var nav = $('main-nav'), t = $('nav-toggle');
-    if (nav) nav.classList.remove('open');
-    if (t) { t.setAttribute('aria-expanded', 'false'); t.innerHTML = OT.icon('menu', 20); }
+  /* ---------- "Partners & admin" menu (desktop); on tablet/phone its links sit inline in the scrolling bar ---------- */
+  var moreOpen = false;
+  function setMore(open) {
+    var b = $('nav-more-btn'), m = $('nav-more'); if (!b || !m) return;
+    moreOpen = open; m.classList.toggle('open', open); b.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var menu = $('nav-more-menu');
+    if (open && menu) {   // fixed position: the nav bar scrolls sideways (overflow), which would clip an absolute dropdown
+      var r = b.getBoundingClientRect();
+      menu.style.top = Math.round(r.bottom + 6) + 'px';
+      menu.style.left = Math.round(Math.max(8, Math.min(window.innerWidth - 248, r.right - 240))) + 'px';
+    }
   }
+  function closeMenu() { setMore(false); }
 
+  /** Keep the active tab visible in the horizontally scrolling bar. */
+  function revealActive() {
+    var row = $('nav-row'), a = row && row.querySelector('a.on');
+    if (!row || !a || row.scrollWidth <= row.clientWidth + 1) return;
+    var rr = row.getBoundingClientRect(), ar = a.getBoundingClientRect();
+    if (ar.left < rr.left + 8 || ar.right > rr.right - 8) row.scrollLeft += (ar.left + ar.width / 2) - (rr.left + rr.width / 2);
+  }
   function highlight(r) {
     var sec = SECTION[r.name] || r.section || r.name;
     OT.$$('#main-nav a[data-nav]').forEach(function (a) {
@@ -116,7 +132,9 @@
       a.classList.toggle('on', on);
       if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
     });
+    var mb = $('nav-more-btn'); if (mb) mb.classList.toggle('on', !!MORE[sec]);
     closeMenu();
+    setTimeout(revealActive, 30);
   }
 
   /** Header mic: voice search on the home page (or start it there). */
@@ -126,14 +144,14 @@
     else OT.go('home?voice=1');
   };
 
-  /** Collapse the nav into the menu whenever it does not fit (long labels in some scripts). */
+  /** Header row: tighten tools if long labels do not fit. The nav bar itself scrolls sideways instead of collapsing. */
   shell.fitHeader = function () {
-    var hdr = OT.$('.app-header'), c = hdr && hdr.querySelector('.container');
+    var hdr = OT.$('.app-header'), c = hdr && hdr.querySelector('.hdr-row'), row = $('nav-row');
     if (!hdr || !c) return;
-    hdr.classList.remove('tight', 'compact');
-    if (window.innerWidth <= 1100) return;           // base.css already uses the menu here
+    hdr.classList.remove('tight');
     if (c.scrollWidth > c.clientWidth + 1) hdr.classList.add('tight');
-    if (c.scrollWidth > c.clientWidth + 1) hdr.classList.add('compact');
+    if (row) hdr.classList.toggle('nav-scrolls', row.scrollWidth > row.clientWidth + 1);
+    revealActive();
   };
 
   shell.rerender = function () {
@@ -143,7 +161,7 @@
   };
 
   shell.init = function () {
-    setIcon('nav-toggle', 'menu');
+    OT.$$('#main-nav [data-ic]').forEach(function (e) { e.innerHTML = OT.icon(e.getAttribute('data-ic'), e.classList.contains('nav-chev') ? 14 : 16); });
     setIcon('lang-globe', 'globe', 16);
     setIcon('hdr-mic', 'mic');
     setIcon('hdr-assistant', 'chat');
@@ -154,18 +172,12 @@
     updateUser();
     OT.i18n.apply(document);
 
-    var t = $('nav-toggle'), nav = $('main-nav');
-    if (t && nav) t.addEventListener('click', function (e) {
-      e.stopPropagation(); // the icon is re-rendered below; the outside-click handler must not see a detached target
-      var open = !nav.classList.contains('open');
-      nav.classList.toggle('open', open);
-      t.setAttribute('aria-expanded', open ? 'true' : 'false');
-      t.innerHTML = OT.icon(open ? 'x' : 'menu', 20);
-    });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+    var mb = $('nav-more-btn');
+    if (mb) mb.addEventListener('click', function (e) { e.stopPropagation(); setMore(!moreOpen); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && moreOpen) { closeMenu(); if (mb) mb.focus(); } });
     document.addEventListener('click', function (e) {
       if (!e.target.isConnected) return;
-      if (nav && nav.classList.contains('open') && !e.target.closest('#main-nav') && !e.target.closest('#nav-toggle')) closeMenu();
+      if (moreOpen && !e.target.closest('#nav-more')) closeMenu();
     });
 
     bindMenu();
@@ -176,6 +188,8 @@
 
     shell.fitHeader();
     window.addEventListener('resize', OT.debounce(shell.fitHeader, 120));
+    window.addEventListener('scroll', function () { if (moreOpen) closeMenu(); }, { passive: true });
+    var nr = $('nav-row'); if (nr) nr.addEventListener('scroll', function () { if (moreOpen) closeMenu(); }, { passive: true });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(shell.fitHeader).catch(function () {});
     OT.on('route', highlight);
     OT.on('store:user', updateUser);

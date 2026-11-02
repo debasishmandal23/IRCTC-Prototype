@@ -83,9 +83,14 @@
         var b = document.querySelector('#trn-pay'); if (b) b.click();
         return waitFor(function () { return document.querySelector('.modal-backdrop.show .modal'); }, 3000);
       } },
+    { title: 'Payment successful', text: 'A Google-Pay-style success screen: the check draws in, the amount in large type, who was paid, UPI reference, transaction ID, time and the PNR. A soft chime plays unless muted; animations are skipped for people who prefer reduced motion.',
+      target: ['.ps-card', '[data-tour="pay-success"]'], enter: function () {
+        clickPrimaryInModal();
+        return waitFor(function () { return document.querySelector('.ps-overlay.show .ps-card'); }, 6000);
+      } },
     { title: 'PNR issued, journey created', text: 'A simulated PNR and e-ticket with berth status (CNF / RAC / WL with a chance of confirmation). The ticket automatically becomes the first item of My Journey, and it can be cancelled later with railway-style refund rules.',
       target: '[data-tour="ticket"]', enter: function () {
-        clickPrimaryInModal();
+        if (OT.paySuccess) OT.paySuccess.close(true);
         return waitFor(function () { return document.querySelector('[data-tour="ticket"]'); }, 6000);
       } },
     { title: 'Step 3 · Agents plan the stay', text: '“Now plan your stay in Chandigarh” runs the orchestrator: Multilingual → Research → Verification → Recommendation → Itinerary, with tool calls, sources and timings.',
@@ -104,6 +109,11 @@
             if (j && !j.items.some(function (i) { return i.refId === 'C-CDG-01'; }) && view('results').add) view('results').add('C-CDG-01', { quiet: true });
           });
       } },
+    { title: 'Station → hotel: every way, side by side', text: 'Not just cabs: cab, auto-rickshaw, city bus, metro, e-rickshaw and walking, compared for Sunita’s party of 3 with price (total and per person), time, wait, comfort, luggage, door-to-door, CO₂ and honest availability: “No metro in Chandigarh”. Badges mark the cheapest, the fastest and the best for her group.',
+      target: ['[data-tour="transport-compare"]'], enter: function () {
+        if (view('results').tab) view('results').tab('cab');
+        return OT.sleep(250);
+      } },
     { title: 'My Journey: the train comes first', text: 'One dashboard. The booked train is the first node of the railway route-line timeline (navy), local legs follow in saffron. The Itinerary Agent flags a conflict: arrival 11:05 vs hotel check-in 14:00.',
       target: ['[data-tour="conflict"]', '[data-tour="timeline"]'], enter: function () { return go('journey').then(function () { return waitFor(function () { return document.querySelector('[data-tour="timeline"]'); }, 3000); }); } },
     { title: 'Resolved, readiness rises', text: 'We leave bags at the station cloakroom and link a return train. The conflict turns green and the weighted Trip Readiness ring climbs, with every point explained.',
@@ -120,13 +130,14 @@
         if (view('checkout').pay) view('checkout').pay();
         return waitFor(function () { return document.querySelector('.modal-backdrop.show .modal'); }, 3000);
       } },
-    { title: 'Booking confirmed', text: 'Booking references and a simulated transaction ID are issued; partner P-101 is notified.',
-      target: '[data-tour="confirmation"]', enter: function () {
+    { title: 'Paid, plus a one-page itinerary', text: 'Booking references and a simulated UPI reference are issued and partner P-101 is notified. “Your one-page itinerary” gives an A4 PDF (print view), a PNG drawn on a canvas, and WhatsApp or email sending, each behind DPDP consent and a confirm step.',
+      target: [function () { return window.innerWidth >= 1000 ? document.querySelector('.ps-overlay.show .ps-card') : null; }, '[data-tour="itin-snapshot"]', '.ps-card'], enter: function () {
         clickPrimaryInModal();
-        return waitFor(function () { return document.querySelector('[data-tour="confirmation"]'); }, 5000);
+        return waitFor(function () { return document.querySelector('.ps-overlay.show [data-tour="itin-snapshot"]'); }, 6000);
       } },
     { title: 'Assistant answers in Hindi, aloud', text: 'The Customer Support Agent answers a refund question in Hindi, cites the policy it used, keeps the English original one tap away, and reads the reply aloud (or shows the text if this device has no Hindi voice).',
       target: '.asst-drawer', enter: function () {
+        if (OT.paySuccess) OT.paySuccess.close(true);
         if (!OT.assistant) return null;
         OT.assistant.open();
         return OT.assistant.ask('मेरा रिफंड कब आएगा?', { speak: true })
@@ -249,6 +260,7 @@
     OT.store.set('journey', undefined);
     OT.store.set('user', undefined);
     if (OT.shell && OT.shell.userMenu) OT.shell.userMenu(false);
+    if (OT.paySuccess) OT.paySuccess.close(true);
     if (OT.assistant) { OT.assistant.close(); OT.assistant.reset(); }
     if (OT.i18n.lang() !== 'en') OT.i18n.setLang('en');
     done = {}; steps.forEach(function (s) { s.hash = null; });

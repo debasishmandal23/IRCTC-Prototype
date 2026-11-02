@@ -400,6 +400,16 @@
           .map(function (r) { return '<tr>' + r.map(function (c, i) { return '<td>' + (i === 0 ? '<strong>' + esc(c) + '</strong>' : esc(c)) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>') + K.simLine();
   }
 
+  /* v1.2: itinerary sends (WhatsApp / email) logged by the traveller app. Simulated deliveries, masked recipients. */
+  function notifHTML() {
+    var l = (OT.store.get('notifications', []) || []).slice().reverse();
+    var rows = l.length ? l.slice(0, 10).map(function (n) {
+      return '<tr><td>' + esc(OT.stamp(new Date(n.at))) + '</td><td>' + esc(n.channel === 'whatsapp' ? 'WhatsApp' : 'Email') + '</td><td><bdi class="keep">' + esc(n.to) + '</bdi></td><td>' + esc((n.refs || []).join(', ') || '—') + '</td><td>' + OT.badge('confirmed', n.status) + '</td></tr>';
+    }).join('') : '<tr><td colspan="5" class="muted">' + esc(t('admin.ntf.none', 'No itinerary has been sent from this browser yet.')) + '</td></tr>';
+    return '<div data-tour="notif-log">' + K.sec(t('admin.ntf.title', 'Notifications log: itinerary sends'), esc(t('admin.ntf.sub', 'One-page itineraries sent by travellers after consent (DPDP). Simulated delivery; recipients are masked. Production: WhatsApp Business API + transactional email.')),
+      '<div class="table-wrap"><table class="table"><thead><tr><th>' + esc(t('admin.ntf.when', 'When')) + '</th><th>' + esc(t('admin.ntf.channel', 'Channel')) + '</th><th>' + esc(t('admin.ntf.to', 'To (masked)')) + '</th><th>' + esc(t('admin.ntf.refs', 'Booking refs')) + '</th><th>' + esc(t('admin.ntf.status', 'Status')) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>') + '</div>';
+  }
+
   /* ---------- main ---------- */
   var SUBS = ['overview', 'users', 'bookings', 'complaints', 'partners', 'demand', 'finance', 'language', 'platform'];
   function render(el, params) {
@@ -423,7 +433,7 @@
       sub: sub === 'overview' ? esc(t('admin.ovSub', 'Pilot across 10 rail destinations. Every number is simulated except bookings you make in this browser.')) : ''
     });
     var body = root.querySelector('[data-dash-body]');
-    var draw = function () { ({ overview: overview, users: users, bookings: bookings, complaints: complaints, partners: partners, demand: demand, finance: finance, language: language, platform: platform })[sub](body); };
+    var draw = function () { ({ overview: overview, users: users, bookings: bookings, complaints: complaints, partners: partners, demand: demand, finance: finance, language: language, platform: platform })[sub](body); if (sub === 'complaints') body.insertAdjacentHTML('beforeend', notifHTML()); };
     draw();
     root.addEventListener('change', function (e) { if (e.target.id === 'p-sort') { pSort = e.target.value; draw(); } });
     root.addEventListener('click', function (e) {

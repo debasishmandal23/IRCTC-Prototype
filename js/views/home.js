@@ -1,4 +1,5 @@
-/* IRCTC OneTrip — Home (v1.1): Step 1 train search (from/to/date/class/passengers), an intent-routing
+/* IRCTC OneTrip — Home (v1.2): a tabbed booking widget (Trains | Hotels | Local transport | Food | Sightseeing |
+ * Packages) — train-first stays the main path, every service can also be booked on its own — then an intent-routing
  * "just say it" box (voice or text, any language: train / hotel / cab / status / refund), the station
  * name-board hero, "For you" personalised suggestions, PNR import and sample journeys. (Builder A)
  */
@@ -19,6 +20,11 @@
     { k: 'freeCancel', key: 'pref.freeCancel', en: 'Free cancellation' }, { k: 'family', key: 'pref.family', en: 'Family' }, { k: 'temple', key: 'pref.temple', en: 'Temple visit' }
   ];
   var SAMPLE_EN = 'book from Chandigarh to Mumbai train';
+  var BW = [['trains', 'train', 'bw.trains', 'Trains'], ['hotels', 'hotel', 'bw.hotels', 'Hotels'], ['transport', 'bus', 'bw.transport', 'Local transport'],
+    ['food', 'food', 'bw.food', 'Food'], ['sights', 'sight', 'bw.sights', 'Sightseeing'], ['packages', 'layers', 'bw.packages', 'Packages']];
+  function plus(n) { var d = new Date(); d.setDate(d.getDate() + n); return OT.data.rail.ymd(d); }
+  function qs(o) { return Object.keys(o).filter(function (k) { return o[k] != null && o[k] !== ''; }).map(function (k) { return k + '=' + encodeURIComponent(o[k]); }).join('&'); }
+  function paxSel(id, n) { return '<select id="' + id + '" class="input">' + [1, 2, 3, 4, 5, 6, 7, 8].map(function (k) { return '<option' + (k === n ? ' selected' : '') + '>' + k + '</option>'; }).join('') + '</select>'; }
   function t(k, fb, v) { return OT.t(k, fb, v); }
   function L() { return OT.i18n.lang(); }
 
@@ -86,6 +92,7 @@
     var prefs = stay.prefs || u.prefs || (D().scenarios[to] ? D().scenarios[to].prefs : { nearStation: true });
     var draft = OT.state.homeDraft || '';
     var TR = OT.trains;
+    var tab = BW.some(function (b) { return b[0] === q.tab; }) ? q.tab : (OT.state.homeTab || 'trains');
 
     el.innerHTML =
       '<section class="hero">' +
@@ -99,6 +106,10 @@
       '<div class="board-slot" data-board-slot data-code="' + to + '">' + boardHTML(to) + '</div>' +
       '</div>' +
       '<div class="search-card card" id="trip-form">' +
+      '<div class="bw-tabs" role="tablist" aria-label="' + OT.esc(t('bw.aria', 'What do you want to book?')) + '" data-tour="book-tabs">' + BW.map(function (b) {
+        return '<button type="button" role="tab" class="bw-tab" id="bw-t-' + b[0] + '" data-bw="' + b[0] + '" aria-controls="bw-p-' + b[0] + '" aria-selected="' + (b[0] === tab) + '">' + OT.icon(b[1], 18) + '<span>' + OT.esc(t(b[2], b[3])) + '</span></button>';
+      }).join('') + '</div>' +
+      '<div class="bw-panel" role="tabpanel" id="bw-p-trains" aria-labelledby="bw-t-trains"' + (tab === 'trains' ? '' : ' hidden') + '>' +
       /* Step 1: trains */
       '<form id="train-form" class="train-form" novalidate data-tour="train-form">' +
       '<p class="step-label">' + OT.icon('train', 15) + ' ' + OT.esc(t('home.step1', 'Step 1 · Find trains')) + '</p>' +
@@ -112,7 +123,7 @@
       '<div class="field"><label for="tf-pax">' + OT.esc(t('search.pax', 'Travellers')) + '</label><select id="tf-pax" class="input">' + [1, 2, 3, 4, 5, 6].map(function (n) { return '<option' + (n === (u.party ? u.party.length : 2) ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></div></div>' +
       '<div class="form-error hidden" id="tf-err" role="alert"></div>' +
       '<button type="submit" class="btn btn-primary btn-lg btn-block" id="train-go">' + OT.icon('search', 18) + OT.esc(t('trn.search', 'Search trains')) + '</button>' +
-      '</form>' +
+      '</form></div>' + servicePanels(tab, to, budget, prefs, u) +
       '<div class="or-rule"><span>' + OT.esc(t('home.orSay', 'or just say it, in any language')) + '</span></div>' +
       /* ask box */
       '<form class="ask voice-box" id="ask-form" data-tour="voice" novalidate>' +
@@ -131,9 +142,6 @@
       '<button type="button" class="chip sample-chip" data-sample="ta">' + OT.icon('play', 12) + ' தமிழ் · ' + OT.esc(t('home.sampleHotel', 'hotel')) + '</button>' +
       '<button type="button" class="chip sample-chip" data-sample="bn">' + OT.icon('play', 12) + ' বাংলা · ' + OT.esc(t('home.sampleHotel', 'hotel')) + '</button>' +
       '</div>' +
-      '<details class="stay-prefs"><summary class="small">' + OT.icon('hotel', 14) + ' ' + OT.esc(t('home.stayPrefs', 'Stay preferences (hotel budget, veg, family…)')) + '</summary>' +
-      '<div class="field mt8"><label for="f-budget">' + OT.esc(t('search.budget', 'Hotel budget per night')) + '</label><div class="rupee-input"><span>₹</span><input id="f-budget" class="input" type="number" min="500" max="20000" step="100" value="' + budget + '" inputmode="numeric"></div></div>' +
-      '<div class="chips mt8" id="f-prefs">' + PREFS.map(function (p) { return '<button type="button" class="chip" data-pref="' + p.k + '" aria-pressed="' + (prefs[p.k] ? 'true' : 'false') + '">' + OT.esc(t(p.key, p.en)) + '</button>'; }).join('') + '</div></details>' +
       '</form>' +
       '<div class="form-foot">' +
       '<button type="button" class="btn-link small" id="pnr-btn">' + OT.icon('train', 14) + ' ' + OT.esc(t('home.havePnr', 'I already have a ticket → import PNR (simulated)')) + '</button>' +
@@ -167,10 +175,126 @@
       }).join('') + '</div></section>';
 
     bind(el);
+    bindServices(el, to);
     cycleBoard(to);
     if (OT.forYou) OT.forYou.render(el.querySelector('#for-you-slot'), { place: 'home' });
     if (draft) preview(draft);
     if (q.voice === '1') setTimeout(function () { startVoice(); }, 150);
+  }
+
+  /* ---------------- booking widget: service tabs ---------------- */
+  function servicePanels(tab, to, budget, prefs, u) {
+    var city = to, guests = u.party ? u.party.length : 2, stay = OT.state.stay || {};
+    var P = OT.data.transport.places(city), hp = P.filter(function (p) { return p.kind === 'hotel'; })[0];
+    function panel(id, html) { return '<div class="bw-panel" role="tabpanel" id="bw-p-' + id + '" aria-labelledby="bw-t-' + id + '"' + (tab === id ? '' : ' hidden') + '>' + html + '</div>'; }
+    var city2 = function (id) { return OT.trains.picker(id, city, t('svc.city', 'City, area or station')); };
+    return panel('hotels', '<form id="hw-form" class="bw-form" novalidate data-tour="hotel-form">' +
+        '<p class="step-label">' + OT.icon('hotel', 15) + ' ' + OT.esc(t('bw.hotelsLbl', 'Book a hotel on its own')) + '</p>' + city2('hw-city') +
+        '<div class="bw-grid g4">' +
+        '<div class="field"><label for="hw-in">' + OT.esc(t('svc.checkin', 'Check-in')) + '</label><input id="hw-in" class="input" type="date" min="' + plus(0) + '" value="' + plus(7) + '"></div>' +
+        '<div class="field"><label for="hw-out">' + OT.esc(t('svc.checkout', 'Check-out')) + '</label><input id="hw-out" class="input" type="date" min="' + plus(1) + '" value="' + plus(9) + '"></div>' +
+        '<div class="field"><label for="hw-guests">' + OT.esc(t('svc.guests', 'Guests')) + '</label>' + paxSel('hw-guests', guests) + '</div>' +
+        '<div class="field"><label for="hw-rooms">' + OT.esc(t('svc.rooms', 'Rooms')) + '</label>' + paxSel('hw-rooms', Math.ceil(guests / 2)) + '</div></div>' +
+        OT.budget.html({ id: 'hwb', lo: stay.min || OT.budget.MIN, hi: budget, count: false }) +
+        '<div class="chips mt8" id="f-prefs">' + PREFS.map(function (p) { return '<button type="button" class="chip" data-pref="' + p.k + '" aria-pressed="' + (prefs[p.k] ? 'true' : 'false') + '">' + OT.esc(t(p.key, p.en)) + '</button>'; }).join('') + '</div>' +
+        '<p class="form-error hidden" id="hw-err" role="alert"></p>' +
+        '<button type="submit" class="btn btn-primary btn-lg btn-block" id="hw-go">' + OT.icon('search', 18) + OT.esc(t('svc.searchHotels', 'Search hotels')) + '</button></form>') +
+      panel('transport', '<form id="tw-form" class="bw-form" novalidate data-tour="transport-form">' +
+        '<p class="step-label">' + OT.icon('bus', 15) + ' ' + OT.esc(t('bw.txLbl', 'Cab, auto, bus or metro inside a city')) + '</p>' + city2('tw-city') +
+        '<div class="bw-grid2">' + OT.services.placePicker('tw-from', city, 'stn:' + city, t('search.from', 'From')) + OT.services.placePicker('tw-to', city, hp ? hp.id : '', t('search.to', 'To')) + '</div>' +
+        '<div class="bw-grid g3">' +
+        '<div class="field"><label for="tw-date">' + OT.esc(t('search.date', 'Travel date')) + '</label><input id="tw-date" class="input" type="date" min="' + plus(0) + '" value="' + plus(1) + '"></div>' +
+        '<div class="field"><label for="tw-time">' + OT.esc(t('tx.timeLbl', 'Time')) + '</label><input id="tw-time" class="input" type="time" value="11:30"></div>' +
+        '<div class="field"><label for="tw-pax">' + OT.esc(t('search.pax', 'Travellers')) + '</label>' + paxSel('tw-pax', guests) + '</div></div>' +
+        '<p class="form-error hidden" id="tw-err" role="alert"></p>' +
+        '<button type="submit" class="btn btn-primary btn-lg btn-block" id="tw-go">' + OT.icon('route', 18) + OT.esc(t('tx.compareBtn', 'Compare options')) + '</button></form>') +
+      ['food', 'sights'].map(function (k) {
+        return panel(k, '<form id="' + k + '-wf" class="bw-form" novalidate>' +
+          '<p class="step-label">' + OT.icon(k === 'food' ? 'food' : 'sight', 15) + ' ' + OT.esc(k === 'food' ? t('bw.foodLbl', 'Meals and restaurant tables') : t('bw.sightsLbl', 'Entry tickets and tours')) + '</p>' + city2(k + '-city') +
+          '<div class="bw-grid g2">' +
+          '<div class="field"><label for="' + k + '-date">' + OT.esc(t('search.date', 'Travel date')) + '</label><input id="' + k + '-date" class="input" type="date" min="' + plus(0) + '" value="' + plus(1) + '"></div>' +
+          '<div class="field"><label for="' + k + '-guests">' + OT.esc(t('svc.guests', 'Guests')) + '</label>' + paxSel(k + '-guests', guests) + '</div></div>' +
+          '<button type="submit" class="btn btn-primary btn-lg btn-block">' + OT.icon('search', 18) + OT.esc(t('svc.search', 'Search')) + '</button></form>');
+      }).join('') +
+      panel('packages', '<div class="bw-pk" id="bw-pk"></div>');
+  }
+  function setTab(id, persist) {
+    if (!root) return;
+    if (persist) OT.state.homeTab = id;
+    OT.$$('[data-bw]', root).forEach(function (b) { b.setAttribute('aria-selected', b.getAttribute('data-bw') === id ? 'true' : 'false'); });
+    OT.$$('.bw-panel', root).forEach(function (p) { p.hidden = p.id !== 'bw-p-' + id; });
+    var b = root.querySelector('[data-bw="' + id + '"]'), bar = b && b.parentElement;
+    if (b && bar && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = b.offsetLeft - (bar.clientWidth - b.offsetWidth) / 2;
+    if (id === 'packages') packagesInto(root.querySelector('#bw-pk'));
+  }
+  /** Packages tab: long-weekend packages for the signed-in persona, or a sample family of 2 from New Delhi. */
+  function packagesInto(box) {
+    if (!box) return;
+    var p = OT.forYou && OT.forYou.persona();
+    var who = p || { kind: 'family', party: [{}, {}], budget: 3000, homeCity: (OT.store.get('user') || {}).homeCity || 'NDLS', prefs: {} };
+    var lw = OT.data.demand.longWeekends(null, 3)[0];
+    if (!lw) { box.innerHTML = '<p class="small muted">' + OT.esc(t('bw.noLw', 'No long weekend coming up in the sample calendar.')) + '</p>'; return; }
+    var trs = OT.data.demand.trends(who.homeCity, lw, who).slice(0, 3), pks = trs.map(function (tr) { return OT.data.demand.pkg(who, tr, lw); });
+    box.innerHTML = '<p class="step-label">' + OT.icon('layers', 15) + ' ' + OT.esc(t('bw.pkLbl', 'Packages for {lw}', { lw: (L() === 'hi' && lw.holiday.hi ? lw.holiday.hi : lw.holiday.name) + ' · ' + t('fy.days', '{n} days', { n: lw.days }) })) + '</p>' +
+      '<p class="xs muted">' + OT.esc(p ? t('bw.pkFor', 'Picked for {name} from {city} (aggregated, simulated demand).', { name: p.short, city: D().stationName(who.homeCity, L()) }) : t('bw.pkSample', 'Sample: a family of 2 from {city}. Sign in as a persona for personalised packages.', { city: D().stationName(who.homeCity, L()) })) + '</p>' +
+      '<ul class="bw-pk-list">' + trs.map(function (tr, i) {
+        var pk = pks[i]; if (!pk) return '';
+        return '<li><div><strong>' + OT.esc(tr.label) + '</strong><span class="xs muted"><bdi class="keep">' + OT.esc(who.homeCity) + '</bdi> → <bdi class="keep">' + OT.esc(tr.to) + '</bdi> · ' + OT.esc(t('fy.pkg', 'Suggested package · {n} nights', { n: pk.nights })) + '</span>' +
+          '<span class="xs">' + pk.lines.map(function (l) { return OT.esc(l.label.split(' · ')[0]); }).slice(0, 4).join(' + ') + '</span></div>' +
+          '<div class="bw-pk-r"><bdi class="keep">' + OT.esc(OT.inr(pk.total)) + '</bdi><button type="button" class="btn btn-accent btn-sm" data-bw-pkg="' + i + '">' + OT.esc(t('fy.book', 'Book this package')) + '</button></div></li>';
+      }).join('') + '</ul>';
+    OT.$$('[data-bw-pkg]', box).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var pk = pks[+b.getAttribute('data-bw-pkg')]; if (!pk) return;
+        OT.state.pendingPackage = { to: pk.to, from: pk.from, date: pk.date, ret: pk.returnDate, nights: pk.nights, hotel: pk.hotel && pk.hotel.id, cab: pk.cab && pk.cab.id, sight: pk.sight && pk.sight.id, cls: pk.cls, pax: pk.pax };
+        OT.toast(t('fy.pkgToast', 'Package started: first book the train, then the hotel, cab and sight are added for you.'), 'info');
+        OT.go(OT.trains.path({ from: pk.from, to: pk.to, date: pk.date, cls: pk.cls, pax: pk.pax, pkg: 1 }));
+      });
+    });
+  }
+  function bindServices(el, to) {
+    OT.$$('[data-bw]', el).forEach(function (b) {
+      b.addEventListener('click', function () { setTab(b.getAttribute('data-bw'), true); });
+      b.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+        var ids = BW.map(function (x) { return x[0]; }), i = ids.indexOf(b.getAttribute('data-bw')) + (e.key === 'ArrowRight' ? 1 : -1);
+        var nx = ids[(i + ids.length) % ids.length]; setTab(nx, true); var nb = el.querySelector('[data-bw="' + nx + '"]'); if (nb) nb.focus();
+      });
+    });
+    var twCity = to;
+    OT.trains.bindPicker(el, 'hw-city');
+    OT.trains.bindPicker(el, 'tw-city', function (c) {
+      twCity = c;
+      var f = el.querySelector('#tw-from'), tt = el.querySelector('#tw-to'), P = OT.data.transport.places(c), h = P.filter(function (p) { return p.kind === 'hotel'; })[0];
+      if (f) { f.value = P[0].short; f.setAttribute('data-place', P[0].id); }
+      if (tt) { tt.value = h ? h.short : ''; tt.setAttribute('data-place', h ? h.id : ''); }
+    });
+    OT.services.bindPlacePicker(el, 'tw-from', function () { return twCity; });
+    OT.services.bindPlacePicker(el, 'tw-to', function () { return twCity; });
+    OT.trains.bindPicker(el, 'food-city'); OT.trains.bindPicker(el, 'sights-city');
+    OT.budget.bind(el, 'hwb', function () { readStay(); });
+    el.querySelector('#hw-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var c = OT.trains.codeOf(el, 'hw-city'), a = el.querySelector('#hw-in').value, b = el.querySelector('#hw-out').value, err = el.querySelector('#hw-err');
+      var msg = !c ? t('svc.errCity', 'Pick a city or station from the list.') : !a || a < plus(0) ? t('trn.errPast', 'That date is in the past. Pick today or a later date.') : !b || b <= a ? t('svc.errOut', 'Check-out must be after check-in.') : '';
+      if (msg) { err.textContent = msg; err.classList.remove('hidden'); return; }
+      var st = readStay();
+      OT.go('hotels?' + qs({ city: c, 'in': a, out: b, guests: el.querySelector('#hw-guests').value, rooms: el.querySelector('#hw-rooms').value, min: st.min, max: st.budget }));
+    });
+    el.querySelector('#tw-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var f = el.querySelector('#tw-from').getAttribute('data-place'), tt = el.querySelector('#tw-to').getAttribute('data-place'), err = el.querySelector('#tw-err');
+      var msg = !f || !tt ? t('tx.errPick', 'Pick a From and a To place from the list.') : f === tt ? t('tx.errSame', 'From and To must be different places.') : '';
+      if (msg) { err.textContent = msg; err.classList.remove('hidden'); return; }
+      OT.go('transport?' + qs({ city: OT.trains.codeOf(el, 'tw-city') || twCity, from: f, to: tt, date: el.querySelector('#tw-date').value, time: el.querySelector('#tw-time').value, pax: el.querySelector('#tw-pax').value }));
+    });
+    ['food', 'sights'].forEach(function (k) {
+      el.querySelector('#' + k + '-wf').addEventListener('submit', function (e) {
+        e.preventDefault();
+        OT.go(k + '?' + qs({ city: OT.trains.codeOf(el, k + '-city') || to, date: el.querySelector('#' + k + '-date').value, guests: el.querySelector('#' + k + '-guests').value }));
+      });
+    });
+    if (OT.state.homeTab === 'packages') packagesInto(el.querySelector('#bw-pk'));
   }
 
   function status(html, kind) {
@@ -194,7 +318,7 @@
     if (cmd.date) { var di = root.querySelector('#tf-date'); if (di) di.value = cmd.date; }
     if (cmd.cls) { var ci = root.querySelector('#tf-cls'); if (ci) ci.value = cmd.cls; }
     if (cmd.pax) { var pi = root.querySelector('#tf-pax'); if (pi) pi.value = String(cmd.pax); }
-    if (budget) { var bi = root.querySelector('#f-budget'); if (bi) bi.value = budget; }
+    if (budget) { OT.budget.set(root, 'hwb', (OT.state.stay && OT.state.stay.min) || OT.budget.MIN, budget); readStay(); }
     if (it.nearStation) { var b = root.querySelector('[data-pref="nearStation"]'); if (b) b.setAttribute('aria-pressed', 'true'); }
     if (it.prefs.veg) { var v = root.querySelector('[data-pref="veg"]'); if (v) v.setAttribute('aria-pressed', 'true'); }
     var tl = root.querySelector('#translit');
@@ -215,8 +339,9 @@
   function readStay() {
     var prefs = {};
     OT.$$('[data-pref]', root).forEach(function (b) { if (b.getAttribute('aria-pressed') === 'true') prefs[b.getAttribute('data-pref')] = true; });
-    var budget = +(root.querySelector('#f-budget') || {}).value || 3000;
-    OT.state.stay = { budget: budget, prefs: prefs };
+    var lo = root.querySelector('#hwb-lo'), hi = root.querySelector('#hwb-hi');
+    var budget = hi ? +hi.value : 3000, min = lo ? +lo.value : 500;
+    OT.state.stay = { budget: budget, min: min, prefs: prefs };
     return OT.state.stay;
   }
 
@@ -246,8 +371,11 @@
     }
     if (['hotel', 'cab', 'food', 'sight'].indexOf(cmd.intent) >= 0) {
       if (!cmd.to) { status(heard + '<br>' + OT.icon('info', 14) + ' ' + OT.esc(t('cmd.missCity', 'Which city? Say for example “hotel near Chandigarh station”.')), 'warn'); return Promise.resolve(cmd); }
-      status(heard + '<br>' + OT.icon('search', 14) + ' ' + OT.esc(t('cmd.goStay', 'Asking the agents about {what} in {city}…', { what: t('tabs.' + cmd.intent, cmd.intent), city: name(cmd.to) })), 'ok');
-      return planStay(cmd.to, text, cmd.intent).then(function () { return cmd; });
+      var hb = cmd.intent === 'hotel' ? OT.agents.parseQuery(text).budget : null;
+      if (cmd.intent === 'hotel') { setTab('hotels'); OT.trains.setCode(root, 'hw-city', cmd.to); if (hb) { OT.budget.set(root, 'hwb', OT.budget.MIN, hb); readStay(); } }
+      status(heard + '<br>' + OT.icon('search', 14) + ' ' + OT.esc(t('cmd.goStay', 'Asking the agents about {what} in {city}…', { what: t('tabs.' + cmd.intent, cmd.intent), city: name(cmd.to) })) +
+        (hb ? ' <span class="pp-chip pp-budget">' + OT.icon('rupee', 12) + ' ' + OT.esc(t('bud.label', 'Budget per night')) + ': ' + OT.esc(OT.budget.text(OT.budget.MIN, hb)) + '</span>' : ''), 'ok');
+      return new Promise(function (res) { navTimer = setTimeout(res, opts.delay != null ? opts.delay : 600); }).then(function () { return root ? planStay(cmd.to, text, cmd.intent) : false; }).then(function () { return cmd; });
     }
     if (['refund', 'cancel', 'status', 'pnr', 'human'].indexOf(cmd.intent) >= 0 && OT.assistant) {
       status(heard + '<br>' + OT.icon('chat', 14) + ' ' + OT.esc(t('cmd.goAsst', 'Opening the assistant for that…')), 'ok');
@@ -274,10 +402,11 @@
     }
     return p.then(function (ok) {
       if (!ok) return false;
-      var budget = it.budget || stay.budget;
-      if (same) OT.store.update('journey', function (cur) { cur.budget = budget; cur.prefs = Object.assign({}, cur.prefs, stay.prefs); return cur; });
+      var budget = it.budget || stay.budget, bmin = it.budget ? OT.budget.MIN : stay.min;
+      if (same) OT.store.update('journey', function (cur) { cur.budget = budget; cur.budgetMin = bmin; cur.prefs = Object.assign({}, cur.prefs, stay.prefs); return cur; });
       else {
         var nj = D().scenarios[to] ? D().makeJourney(to, { budget: budget, prefs: stay.prefs }) : D().plannedJourney(to, { budget: budget, prefs: stay.prefs });
+        nj.budgetMin = bmin;
         OT.store.set('journey', nj);
       }
       OT.state.homeDraft = text;
@@ -386,7 +515,7 @@
     el.querySelector('#home-mic').addEventListener('click', startVoice);
     OT.$$('[data-sample]', el).forEach(function (b) { b.addEventListener('click', function () { sample(b.getAttribute('data-sample')); }); });
     OT.$$('[data-pref]', el).forEach(function (b) { b.addEventListener('click', function () { b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); readStay(); }); });
-    var fb = el.querySelector('#f-budget'); if (fb) fb.addEventListener('change', readStay);
+
     el.querySelector('#pnr-btn').addEventListener('click', pnrModal);
     var sd = el.querySelector('[data-start-tour]'); if (sd) sd.addEventListener('click', function () { if (OT.tour) OT.tour.start(); });
     OT.$$('[data-scen]', el).forEach(function (b) {
@@ -394,7 +523,7 @@
         var code = b.getAttribute('data-scen'), sc = D().scenarios[code];
         OT.trains.setCode(el, 'tf-from', sc.from); OT.trains.setCode(el, 'tf-to', code);
         el.querySelector('#tf-pax').value = String(sc.passengers);
-        el.querySelector('#f-budget').value = sc.budget;
+        OT.budget.set(el, 'hwb', OT.budget.MIN, sc.budget); OT.trains.setCode(el, 'hw-city', code); setTab('trains', true);
         OT.$$('[data-pref]', el).forEach(function (p) { p.setAttribute('aria-pressed', sc.prefs[p.getAttribute('data-pref')] ? 'true' : 'false'); });
         ta.value = ''; OT.state.homeDraft = ''; preview('');
         setBoard(code);
@@ -411,6 +540,7 @@
     startVoice: startVoice,
     sample: sample,
     command: handleCommand,
+    tab: setTab,
     /** v1 compatibility: submit the ask box (tour/tests). */
     submit: function () { return root ? handleCommand(root.querySelector('#ask-input').value, { delay: 0 }) : Promise.resolve(null); }
   });

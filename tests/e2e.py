@@ -108,19 +108,24 @@ class Page:
     def click(self, sel, **kw):
         self.p.locator(sel).first.click(**kw)
 
-    def modal_ok(self):
+    def modal_ok(self, keep_success=False):
         self.p.wait_for_selector('.modal-backdrop.show .modal-foot .btn-primary, .modal-backdrop.show .modal-foot .btn-danger')
         self.p.locator('.modal-backdrop.show .modal-foot .btn').last.click()
         self.p.wait_for_timeout(300)
+        # v1.2: a confirmed payment shows the success pop-up; close it unless the test inspects it
+        self.p.wait_for_function('() => !(window.OT && OT.state && OT.state.payPending)', timeout=8000)
+        if not keep_success and self.p.locator('.ps-overlay [data-ps-done]').count():
+            self.p.locator('.ps-overlay [data-ps-done]').click()
+            self.p.wait_for_timeout(250)
 
     def wait_run(self, timeout=20000):
         self.p.wait_for_function('() => OT.state.lastRun && OT.state.lastRun.done && document.querySelector(".offer[data-ref]")', timeout=timeout)
         self.p.wait_for_timeout(200)
 
     def nav(self, key):
-        """Click a header nav link, opening the hamburger menu on mobile."""
-        if self.vp == 'mobile' or not self.p.locator('#main-nav a[data-nav="%s"]' % key).is_visible():
-            self.click('#nav-toggle')
+        """Click a link in the horizontal nav bar (v1.2: no hamburger; secondary links sit in "Partners & admin" on desktop)."""
+        if not self.p.locator('#main-nav a[data-nav="%s"]' % key).is_visible() and self.p.locator('#nav-more-btn').is_visible():
+            self.click('#nav-more-btn')
             self.p.wait_for_timeout(150)
         self.click('#main-nav a[data-nav="%s"]' % key)
         self.p.wait_for_timeout(300)
@@ -360,7 +365,7 @@ def settings_flow(pg, tag):
     pg.no_errors('settings ' + tag)
 
 
-ROUTES = ['home', 'results?to=CDG', 'trains?from=CDG&to=CSMT', 'results?to=SC', 'journey', 'checkout', 'bookings', 'login', 'register', 'insights', 'about', 'settings', 'nope-404']
+ROUTES = ['home', 'results?to=CDG', 'trains?from=CDG&to=CSMT', 'results?to=SC', 'hotels?city=JP', 'transport?city=NDLS', 'food?city=JP', 'sights?city=JP', 'itinerary-print', 'journey', 'checkout', 'bookings', 'login', 'register', 'insights', 'about', 'settings', 'nope-404']
 
 
 def route_scan(pg, tag, langs, shots=True):
@@ -976,6 +981,240 @@ def v11_verify(browser, base, vp):
     pg.close()
 
 
+# ---------------------------------------------------------------- v1.2: standalone services, nav bar, payment pop-up, transport, budget, itinerary
+OPEN_STUB = "window.__opened = []; window.open = function (u) { window.__opened.push(String(u)); return null; };"
+PRICE_JS = "() => [...document.querySelectorAll('#svc-list .offer[data-ref^=\"H-\"], #res-main [data-panel=\"hotel\"] .offer[data-ref^=\"H-\"]')].map(o => +o.querySelector('.offer-price .price').innerText.replace(/[^0-9]/g, ''))"
+NAV_JS = r"""() => {
+  const nav = document.querySelector('#main-nav'), row = document.querySelector('#nav-row');
+  const prim = ['home','trains','hotels','transport','journey','bookings'].map(k => document.querySelector('#main-nav a[data-nav="' + k + '"]'));
+  const tops = prim.map(a => Math.round(a.getBoundingClientRect().top));
+  const nr = nav.getBoundingClientRect();
+  return { visible: nav.offsetHeight > 0 && getComputedStyle(nav).display !== 'none', tops, navH: Math.round(nr.height), hamburger: !!document.querySelector('#nav-toggle, .nav-toggle'),
+    allShown: prim.every(a => a.offsetWidth > 0), doc: document.documentElement.scrollWidth, w: innerWidth, fits: row.scrollWidth <= row.clientWidth + 1,
+    more: (document.querySelector('#nav-more-btn') || {}).offsetWidth > 0, inlineSecondary: (document.querySelector('#main-nav a[data-nav="admin"]') || {}).offsetWidth > 0,
+    sticky: getComputedStyle(document.querySelector('.app-header')).position,
+    secTops: ['partner','admin','insights'].map(k => document.querySelector('#main-nav a[data-nav="' + k + '"]')).filter(a => a.offsetWidth).map(a => Math.round(a.getBoundingClientRect().top)) };
+}"""
+
+
+def v12_nav(browser, base):
+    """Primary nav is a horizontal bar at every width, in en/hi and long-label languages; never a hamburger list."""
+    for w in [375, 768, 1024, 1280, 1366, 1440, 1920]:
+        ctx = browser.new_context(viewport={'width': w, 'height': 860})
+        ctx.route(re.compile(r'https://fonts\.(googleapis|gstatic)\.com/.*'), lambda r: r.abort())
+        p = ctx.new_page(); errs = []
+        p.on('pageerror', lambda e: errs.append(str(e)[:200]))
+        p.goto(base + '#/home'); p.wait_for_function('() => window.OT && OT.router.current()')
+        for lang in ['en', 'hi', 'ta', 'ml']:
+            p.evaluate('l => OT.i18n.setLang(l)', lang); p.wait_for_timeout(150)
+            for r in ['home', 'bookings', 'transport?city=NDLS']:
+                p.evaluate("h => location.hash = h", '#/' + r); p.wait_for_timeout(250)
+                n = p.evaluate(NAV_JS)
+                tag = '%dpx [%s] %s' % (w, lang, r.split('?')[0])
+                if r == 'home':
+                    check('nav %s: visible horizontal bar (one row, all 6 primary tabs)' % tag, n['visible'] and n['allShown'] and max(n['tops']) - min(n['tops']) <= 2 and n['navH'] <= 64, n)
+                    check('nav %s: no hamburger list for primary nav' % tag, not n['hamburger'], n)
+                    check('nav %s: header sticky on top' % tag, n['sticky'] == 'sticky', n['sticky'])
+                    if w >= 1024:
+                        check('nav %s: "Partners & admin" menu shown' % tag, n['more'] and not n['inlineSecondary'], n)
+                        if lang == 'en':
+                            check('nav %s: whole bar fits without scrolling' % tag, n['fits'], n)
+                    else:
+                        check('nav %s: partner/admin/business links inline in the same scroll bar row' % tag, n['inlineSecondary'] and not n['more'] and len(n['secTops']) == 3 and all(abs(x - n['tops'][0]) <= 2 for x in n['secTops']), n)
+                check('nav %s: no horizontal page overflow' % tag, n['doc'] <= n['w'], n)
+                if r == 'bookings':
+                    vis = p.evaluate("() => { const a = document.querySelector('#main-nav a.on'), r = document.querySelector('#nav-row').getBoundingClientRect(), b = a && a.getBoundingClientRect(); return !!b && b.left >= r.left - 1 && b.right <= r.right + 1; }")
+                    check('nav %s: active tab highlighted and scrolled into view' % tag, vis)
+        if w >= 1024:
+            p.evaluate('() => OT.i18n.setLang("en")'); p.evaluate("h => location.hash = h", '#/home'); p.wait_for_timeout(200)
+            p.click('#nav-more-btn'); p.wait_for_timeout(150)
+            check('nav %dpx: "Partners & admin" opens a menu' % w, p.locator('#nav-more-menu a[data-nav="admin"]').is_visible())
+            p.click('#nav-more-menu a[data-nav="insights"]'); p.wait_for_timeout(300)
+            check('nav %dpx: menu item navigates (Business case) and closes' % w, p.evaluate('() => OT.router.current().name') == 'insights' and not p.locator('#nav-more-menu a[data-nav="admin"]').is_visible())
+        check('nav %dpx: zero page errors' % w, not errs, errs)
+        ctx.close()
+
+
+def v12_flow(browser, base, vp):
+    tag = 'v12-' + vp
+    pg = Page(browser, base, vp, init=OPEN_STUB)
+    p = pg.p
+    pg.go('home'); pg.ev('() => localStorage.clear()'); p.reload(); p.wait_for_function('() => window.OT && OT.router.current()')
+    # 1. booking widget tabs
+    tabs = pg.ev('() => [...document.querySelectorAll("[data-bw]")].map(b => b.dataset.bw)')
+    check('home booking widget tabs: Trains | Hotels | Local transport | Food | Sightseeing | Packages', tabs == ['trains', 'hotels', 'transport', 'food', 'sights', 'packages'], tabs)
+    check('Trains tab is the default (train-first stays the main path)', p.locator('#bw-p-trains').is_visible() and p.locator('#train-go').is_visible())
+    p.click('[data-bw="hotels"]'); p.wait_for_timeout(150)
+    check('Hotels tab: city, dates, guests, rooms and a VISIBLE budget slider (not collapsed)', all(p.locator(s).is_visible() for s in ['#hw-city', '#hw-in', '#hw-out', '#hw-guests', '#hw-rooms', '#hwb-lo', '#hwb-hi', '#hwb-max']) and p.locator('[data-bud="hwb"] [data-bud-chip]').count() == 4)
+    pg.scan('home hotels tab ' + tag, 'home-hotels-' + tag)
+    p.click('[data-bw="transport"]'); p.wait_for_timeout(150)
+    check('Local transport tab: city + from/to place typeahead + date/time/pax', all(p.locator(s).is_visible() for s in ['#tw-city', '#tw-from', '#tw-to', '#tw-date', '#tw-time', '#tw-pax']))
+    p.fill('#tw-to', 'air'); p.wait_for_timeout(150)
+    check('place typeahead finds the airport', 'Airport' in p.inner_text('#tw-to-list'), p.inner_text('#tw-to-list'))
+    p.keyboard.press('Escape')
+    p.click('[data-bw="packages"]'); p.wait_for_timeout(300)
+    check('Packages tab lists long-weekend packages', p.locator('#bw-pk [data-bw-pkg]').count() >= 1)
+    pg.scan('home packages tab ' + tag)
+    # 2. standalone hotel: budget slider filtering
+    pg.go('hotels?city=JP&guests=2', 400)
+    check('#/hotels route renders verified hotel cards with badge/source/SIMULATED', p.locator('#svc-list .offer[data-ref^="H-JP-"]').count() >= 3 and all(x['ok'] for x in pg.ev(OFFER_JS)), pg.ev(OFFER_JS))
+    check('budget control visible on #/hotels (slider + min/max + chips)', p.locator('#hb-lo').is_visible() and p.locator('#hb-hi').is_visible() and p.locator('#hb-max').is_visible() and p.locator('[data-bud="hb"] [data-bud-chip]').count() == 4)
+    p.fill('#hb-max', '2000'); p.press('#hb-max', 'Enter'); p.wait_for_timeout(250)
+    pr = pg.ev(PRICE_JS); cnt = p.inner_text('#hb-count')
+    check('budget max 2000: every hotel shown is <= 2000 and the count updates', pr and all(x <= 2000 for x in pr) and re.search(r'%d of \d+ hotels within budget' % len(pr), cnt), [pr, cnt])
+    check('slider handle moved with the number input', pg.ev('() => document.querySelector("#hb-hi").value') == '2000')
+    p.click('[data-bud="hb"] [data-bud-chip="2"]'); p.wait_for_timeout(250)
+    pr = pg.ev(PRICE_JS)
+    check('chip ₹3,000–5,000 filters to that range', pr and all(3000 <= x <= 5000 for x in pr) and pg.ev('() => [document.querySelector("#hb-min").value, document.querySelector("#hb-max").value]') == ['3000', '5000'], pr)
+    pg.scan('hotels standalone ' + tag, 'hotels-' + tag)
+    p.click('[data-bud="hb"] [data-bud-chip="1"]'); p.wait_for_timeout(250)
+    p.locator('#svc-list [data-book-now]').first.click()
+    p.wait_for_selector('#pay-btn')
+    j = pg.ev('() => OT.store.get("journey")')
+    check('standalone hotel creates a lightweight trip (no train)', j and j.get('kind') == 'trip' and j.get('train') is None and j['scenario'] == 'JP' and len(j['items']) == 1 and j['items'][0]['nights'] >= 1, j and {k: j.get(k) for k in ['kind', 'scenario', 'start', 'end']})
+    check('checkout shows the trip (no train) and the hotel line', 'Stay in Jaipur' in p.inner_text('.co-items') and p.locator('.co-line').count() == 1)
+    pg.scan('checkout trip ' + tag, 'checkout-trip-' + tag)
+    total = pg.ev('() => document.querySelector(".co-totals .grand strong").innerText')
+    p.click('#pay-btn'); pg.modal_ok(keep_success=True)
+    p.wait_for_selector('.ps-overlay.show .ps-card', timeout=6000)
+    ps = p.inner_text('.ps-card')
+    check('payment pop-up: "Payment successful" + amount in large type', 'Payment successful' in ps and p.inner_text('.ps-amount').strip() == total.strip(), [p.inner_text('.ps-amount'), total])
+    check('payment pop-up: paid to, UPI ref (12 digits), transaction ID, date-time', 'Paid to IRCTC OneTrip' in ps and re.search(r'UPI ref\. no\.\s+\d{12}', ps) and 'SIM-TXN-' in ps and 'IST' in ps, ps[:400])
+    check('payment pop-up: booking refs listed', re.search(r'OT-HTL-[A-Z0-9]{5}', ps))
+    check('payment pop-up: Done / View itinerary / Share buttons', all(p.locator(s).count() == 1 for s in ['[data-ps-done]', '[data-ps-view]', '[data-ps-share]']))
+    check('payment pop-up: "Your one-page itinerary" with PDF / PNG / WhatsApp / Email', 'Your one-page itinerary' in ps and p.locator('.ps-itin [data-it]').count() == 4)
+    check('payment pop-up: animated check circle (SVG) present', p.locator('.ps-check svg .ps-circle').count() == 1 and p.locator('.ps-check svg .ps-tick').count() == 1)
+    rm = pg.ev('() => { const e = document.querySelector(".ps-circle"); return getComputedStyle(e).animationName; }')
+    check('payment pop-up: check is animated (normal motion)', rm and rm != 'none', rm)
+    pg.scan('payment success ' + tag, 'pay-success-' + tag)
+    p.click('[data-ps-done]'); p.wait_for_timeout(300)
+    check('Done closes the pop-up; confirmation stays', p.locator('.ps-overlay').count() == 0 and p.locator('[data-tour="confirmation"]').count() == 1)
+    b = pg.ev('() => (OT.store.get("bookings")||[]).filter(x => x.type === "hotel")[0]')
+    check('standalone hotel in Bookings & refunds', b and b['status'] == 'confirmed' and b['journeyId'] == j['id'], b and b.get('ref'))
+    # 3. My Journey without a train
+    pg.go('journey', 400)
+    check('My Journey: trip without a train ("Stay in Jaipur") + "Add a train to this trip"', 'Stay in Jaipur' in p.inner_text('h1') and p.locator('#add-train').count() == 1 and p.locator('.tl-addtrain').count() == 1)
+    rd = pg.ev('() => OT.agents.readiness(OT.store.get("journey"))')
+    check('readiness adapts to a trip without a train (no ticket/return parts, score is a number)', rd['trip'] and isinstance(rd['score'], (int, float)) and not any(x['id'] in ('ticket', 'ret') for x in rd['parts']) and rd['score'] > 0, rd)
+    check('timeline shows the stay (check-in + check-out)', p.locator('.tl-row.k-checkin').count() == 1 and p.locator('.tl-row.k-checkout').count() == 1)
+    check('one-page itinerary card on My Journey', p.locator('.itin-card [data-it]').count() == 4)
+    pg.scan('journey trip ' + tag, 'journey-trip-' + tag)
+    href = p.get_attribute('#add-train', 'href')
+    check('"Add a train to this trip" pre-fills a train search to Jaipur', href and 'trains?' in href and 'to=JP' in href, href)
+    # 4. transport comparison in a metro city + standalone transport booking (attaches to a new trip after confirm)
+    pg.go('transport?city=NDLS&from=stn:NDLS&to=air:NDLS&time=10:00&pax=3', 400)
+    cards = pg.ev("() => [...document.querySelectorAll('.tx-card')].map(c => ({m: c.dataset.mode, on: !c.classList.contains('is-off'), ver: !!c.querySelector('.tx-ver .badge'), src: /checked/.test((c.querySelector('.tx-ver')||{}).innerText||''), off: (c.querySelector('.tx-off')||{}).innerText || ''}))")
+    avail = [c for c in cards if c['on']]
+    check('Delhi: cab, auto, metro, bus compared side by side (>= 4 modes available)', len(cards) == 6 and len(avail) >= 4 and {'cab', 'auto', 'metro', 'bus'} <= {c['m'] for c in avail}, cards)
+    check('Delhi airport leg: metro available (Airport Express)', any(c['m'] == 'metro' and c['on'] for c in cards), cards)
+    check('every bookable mode has a verification badge + source + checked time', all(c['ver'] and c['src'] for c in avail if c['m'] != 'walk'), cards)
+    badges = pg.ev('() => [...document.querySelectorAll(".tx-card [data-badge]")].map(b => b.dataset.badge)')
+    check('Cheapest, Fastest and Best for your group badges', all(x in badges for x in ['cheapest', 'fastest', 'group']), badges)
+    facts = p.inner_text('.tx-card[data-mode="bus"]')
+    check('comparison shows price total + per person, time, frequency, comfort, luggage, door-to-door, CO₂', all(x in facts for x in ['per person', 'Travel time', 'Frequency', 'Comfort', 'Luggage', 'Door-to-door', 'CO₂']), facts[:300])
+    pg.scan('transport NDLS ' + tag, 'transport-ndls-' + tag)
+    pg.go('transport?city=CDG&from=stn:CDG&to=htl:H-CDG-01&pax=3', 400)
+    m = p.locator('.tx-card[data-mode="metro"]')
+    check('Chandigarh: honest "No metro in Chandigarh"', 'is-off' in (m.get_attribute('class') or '') and 'No metro in Chandigarh' in m.inner_text(), m.inner_text())
+    p.click('.tx-card[data-mode="cab"] [data-tx-pick]')
+    p.wait_for_selector('.modal-backdrop.show')
+    check('booking in another city asks before replacing the current trip', 'Start a new trip?' in p.inner_text('.modal-backdrop.show'))
+    pg.modal_ok(); p.wait_for_selector('#pay-btn')
+    j2 = pg.ev('() => OT.store.get("journey")')
+    check('transport booking attaches to a new trip in Chandigarh', j2['kind'] == 'trip' and j2['scenario'] == 'CDG' and any(i['refId'].startswith('TR-CDG-') for i in j2['items']), j2['scenario'])
+    p.click('#pay-btn'); pg.modal_ok()
+    lb = pg.ev('() => (OT.store.get("bookings")||[]).filter(x => /^OT-LTR-/.test(x.ref))')
+    check('local transport booked standalone (OT-LTR ref) and listed in Bookings', len(lb) == 1)
+    pg.go('bookings', 300)
+    check('Bookings shows the transport booking with a cancel button', p.locator('[data-bk="%s"] [data-cancel]' % lb[0]['ref']).count() == 1)
+    p.click('[data-bk="%s"] [data-cancel]' % lb[0]['ref']); pg.modal_ok()
+    check('standalone transport cancellation works', pg.ev('r => OT.store.get("bookings").find(x => x.ref === r).status', lb[0]['ref']) == 'cancelled')
+    # 5. voice/text "hotel in Jaipur under 3000" sets the budget visibly
+    pg.go('home', 300)
+    p.fill('#ask-input', 'hotel in Jaipur under 3000'); p.press('#ask-input', 'Enter'); p.wait_for_timeout(120)
+    check('voice "under 3000": Hotels tab + budget shown before navigating', p.locator('#bw-p-hotels').is_visible() and pg.ev('() => document.querySelector("#hwb-max").value') == '3000' and 'Up to ₹3,000' in p.inner_text('#voice-status'), p.inner_text('#voice-status'))
+    if p.locator('.modal-backdrop.show').count():
+        pg.modal_ok()
+    p.wait_for_function('() => /#\\/results\\?to=JP/.test(location.hash)', timeout=6000); pg.wait_run()
+    pr = pg.ev(PRICE_JS)
+    check('results: budget control shows max 3000 and every hotel <= 3000', pg.ev('() => document.querySelector("#rb-max").value') == '3000' and pr and all(x <= 3000 for x in pr) and 'hotels within budget' in p.inner_text('#rb-count'), [pr, p.inner_text('#rb-count')])
+    p.fill('#rb-max', '15000'); p.press('#rb-max', 'Enter'); p.wait_for_timeout(300)
+    check('results: widening the budget shows more hotels (no agent re-run)', len(pg.ev(PRICE_JS)) > len(pr))
+    # 6. journey flow: station -> hotel comparison instead of cabs only
+    pg.go('home'); pg.ev('() => { OT.store.set("journey", undefined); OT.state.lastRun = null; }')
+    pg.go('results?to=CDG'); pg.wait_run()
+    p.click('[data-tab="cab"]'); p.wait_for_timeout(200)
+    check('journey flow: Transport tab opens with the station → hotel comparison', p.locator('[data-panel="cab"] [data-tour="transport-compare"] .tx-card').count() == 6 and 'Station → hotel' in p.inner_text('[data-panel="cab"] .tx-head'))
+    check('journey flow: "No metro in Chandigarh" shown there too', 'No metro in Chandigarh' in p.inner_text('[data-panel="cab"] .tx-card[data-mode="metro"]'))
+    p.click('[data-panel="cab"] .tx-card[data-mode="bus"] [data-tx-pick]'); p.wait_for_timeout(300)
+    jj = pg.ev('() => OT.store.get("journey")')
+    rd = pg.ev('() => OT.agents.readiness(OT.store.get("journey")).parts.find(x => x.id === "transfer").state')
+    check('selecting the bus adds the station transfer leg and counts in readiness', any('-bus' in i['refId'] for i in jj['items']) and rd == 'planned', [i['refId'] for i in jj['items']])
+    p.click('[data-panel="cab"] .tx-card[data-mode="cab"] [data-tx-pick]'); p.wait_for_timeout(300)
+    jj = pg.ev('() => OT.store.get("journey")')
+    check('one mode per leg: picking the cab replaces the bus', sum(1 for i in jj['items'] if i['refId'].startswith('TR-')) == 1 and any(i['refId'].endswith('-cab-3') or i['refId'].endswith('-cab') or '-cab' in i['refId'] for i in jj['items']), [i['refId'] for i in jj['items']])
+    pg.scan('results transport ' + tag, 'results-transport-' + tag)
+    # 7. train-first: the ticket page has the budget control when planning the stay
+    pg.go('trains?from=NDLS&to=CDG', 400)
+    p.click('.trn[data-train="12011"] [data-book="CC"]'); p.wait_for_selector('#pax-form')
+    p.fill('#px-n0', 'Test Traveller'); p.fill('#px-a0', '30') if p.locator('#px-a0').count() else None
+    p.click('#trn-pay'); pg.modal_ok(keep_success=True)
+    p.wait_for_selector('.ps-overlay.show .ps-card', timeout=6000)
+    check('train payment shows the success pop-up with the PNR', re.search(r'PNR \d{10}', p.inner_text('.ps-card')) and 'IRCTC' in p.inner_text('.ps-to'))
+    p.click('[data-ps-done]'); p.wait_for_selector('[data-tour="ticket"]')
+    check('ticket page: budget control while planning the stay', p.locator('[data-tour="plan-next"] [data-bud="pb"] #pb-hi').is_visible())
+    # 8. itinerary: print view fits one A4 page; PNG; WhatsApp + email (consent + confirm)
+    pg.go('itinerary-print', 400)
+    check('itinerary print view: sheet with traveller, PNR, timeline, refs, QR-like code, SIMULATED watermark', p.locator('.itin-sheet .it-tl li').count() >= 2 and p.locator('.itin-sheet .it-qr').count() == 1 and 'SIMULATED' in p.inner_text('.itin-sheet') and 'PNR' in p.inner_text('.itin-sheet'))
+    pg.scan('itinerary print ' + tag, 'itinerary-' + tag)
+    if vp == 'desktop':
+        pdf = p.pdf(format='A4', print_background=True)
+        pages = len(re.findall(rb'/Type\s*/Page[^s]', pdf))
+        check('itinerary print: page.pdf (A4, print media) is exactly 1 page', pages == 1, pages)
+    url = pg.ev('() => OT.itinerary.png()')
+    check('PNG snapshot drawn on canvas (toDataURL non-empty)', url.startswith('data:image/png;base64,') and len(url) > 20000, len(url))
+    pg.go('journey', 400)
+    p.click('.itin-card [data-it="wa"]'); p.wait_for_selector('#sh-to')
+    p.fill('#sh-to', '9876543210')
+    p.locator('.modal-backdrop.show .modal-foot .btn').last.click(); p.wait_for_timeout(150)
+    check('WhatsApp: consent is required', p.locator('#sh-err:not(.hidden)').count() == 1 and 'consent' in p.inner_text('#sh-err'))
+    p.check('#sh-consent'); p.locator('.modal-backdrop.show .modal-foot .btn').last.click()
+    p.wait_for_selector('.modal-backdrop.show .confirm-lines')
+    check('WhatsApp: confirm step shows the masked number', '+91 98XXX XX210' in p.inner_text('.modal-backdrop.show .confirm-lines'))
+    with p.expect_download(timeout=5000) as dl:
+        pg.modal_ok()
+    opened = pg.ev('() => window.__opened')
+    wa = opened[-1] if opened else ''
+    import urllib.parse as up
+    txt = up.unquote(wa.split('?text=')[-1]) if '?text=' in wa else ''
+    check('WhatsApp link: https://wa.me/919876543210?text=<summary with refs>', wa.startswith('https://wa.me/919876543210?text=') and 'IRCTC OneTrip itinerary' in txt and re.search(r'PNR \d{10}', txt), wa[:160])
+    check('WhatsApp: PNG downloaded to attach', dl.value.suggested_filename.endswith('.png'), dl.value.suggested_filename)
+    check('WhatsApp: honest note about WhatsApp Business API', 'WhatsApp Business API' in p.inner_text('.modal-backdrop.show') and p.get_attribute('#wa-link', 'href') == wa)
+    p.locator('.modal-backdrop.show .modal-foot .btn').last.click(); p.wait_for_timeout(250)
+    p.click('.itin-card [data-it="mail"]'); p.wait_for_selector('#sh-to')
+    p.fill('#sh-to', 'traveller@example.com'); p.check('#sh-consent'); p.locator('.modal-backdrop.show .modal-foot .btn').last.click()
+    p.wait_for_selector('.modal-backdrop.show .confirm-lines'); pg.modal_ok(); p.wait_for_selector('#mail-link')
+    mh = p.get_attribute('#mail-link', 'href')
+    check('email: mailto link with subject and body', mh.startswith('mailto:traveller@example.com?subject=') and '&body=' in mh and 'IRCTC%20OneTrip%20itinerary' in mh, mh[:120])
+    check('email: "Sent to … (simulated)" confirmation', 'Sent to traveller@example.com (simulated)' in p.inner_text('.modal-backdrop.show'))
+    p.locator('.modal-backdrop.show .modal-foot .btn').last.click(); p.wait_for_timeout(250)
+    nl = pg.ev('() => OT.store.get("notifications")')
+    check('both sends logged (channel, masked recipient, refs)', len(nl) == 2 and nl[0]['channel'] == 'whatsapp' and nl[1]['channel'] == 'email' and 'XXX' in nl[0]['to'], nl)
+    pg.ev('() => OT.auth.signInPersona("admin", { quiet: true })'); p.wait_for_timeout(300)
+    pg.go('admin/complaints', 500)
+    check('Admin notifications log lists the sends', p.locator('[data-tour="notif-log"] tbody tr').count() == 2 and 'WhatsApp' in p.inner_text('[data-tour="notif-log"]'))
+    pg.no_errors('v1.2 ' + vp)
+    pg.close()
+    # reduced motion: no animation on the check
+    ctx = browser.new_context(viewport={'width': VIEWPORTS[vp][0], 'height': VIEWPORTS[vp][1]}, reduced_motion='reduce')
+    ctx.route(re.compile(r'https://fonts\.(googleapis|gstatic)\.com/.*'), lambda r: r.abort())
+    q = ctx.new_page(); q.goto(base + '#/home'); q.wait_for_function('() => window.OT && OT.paySuccess')
+    q.evaluate('() => { OT.paySuccess.show({amount: 999, txn: "SIM-TXN-TEST1", refs: [{label: "x", ref: "OT-HTL-AAAAA"}]}); }'); q.wait_for_timeout(200)
+    st = q.evaluate('() => [getComputedStyle(document.querySelector(".ps-circle")).animationName, getComputedStyle(document.querySelector(".ps-confetti") || document.body).display, !!document.querySelector(".ps-confetti")]')
+    check('prefers-reduced-motion: no check animation, no confetti (%s)' % vp, st[0] == 'none' and not st[2], st)
+    ctx.close()
+
+
 # ---------------------------------------------------------------- main
 def free_port():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); port = s.getsockname()[1]; s.close(); return port
@@ -1056,6 +1295,18 @@ def main():
                             v11_verify(browser, base, vp)
                         except Exception:
                             check('verify v1.1 completed', False, ' | '.join(l.strip() for l in traceback.format_exc().splitlines() if 'e2e.py' in l or 'Error' in l)[:900])
+                    GROUP[0] = 'v1.2 ' + tag
+                    if want('v1.2'):
+                        try:
+                            v12_flow(browser, base, vp)
+                        except Exception:
+                            check('v1.2 flow completed', False, ' | '.join(l.strip() for l in traceback.format_exc().splitlines() if 'e2e.py' in l or 'Error' in l)[:900])
+                        if vp == 'desktop':
+                            GROUP[0] = 'v1.2 nav ' + bname
+                            try:
+                                v12_nav(browser, base)
+                            except Exception:
+                                check('v1.2 nav completed', False, traceback.format_exc()[-600:])
             browser.close()
     finally:
         srv.terminate()

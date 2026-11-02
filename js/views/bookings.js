@@ -29,7 +29,7 @@
     var x = D().get(b.refId) || {}, rf = OT.agents.refundFor(b);
     var st = b.status, pol = b.type === 'train' ? { rail: true } : x.policy, tk = b.ticket;
     return '<article class="bkg card-flat' + (b.type === 'train' ? ' bkg-train' : '') + '" data-bk="' + b.ref + '">' +
-      '<div class="bk-top"><span class="offer-ic">' + OT.icon(x.service ? 'lock' : b.type, 20) + '</span>' +
+      '<div class="bk-top"><span class="offer-ic">' + OT.icon(OT.itemIcon(x, b.type), 20) + '</span>' +
       '<div class="bk-title"><strong>' + OT.esc(b.title) + '</strong><span class="xs muted">' + OT.esc(b.provider || '') + ' · ' + keep(b.ref) + '</span></div>' +
       '<div class="bk-amt">' + keep(OT.inr(b.amount)) + OT.badge(st) + (tk && st === 'confirmed' && tk.status !== 'CNF' ? OT.badge('pending', tk.passengers[0].status + ' · ' + t('trn.chance', '{p}% chance', { p: tk.chance })) : '') + '</div></div>' +
       (tk ? '<p class="small bk-tk">' + OT.icon('train', 14) + ' PNR ' + keep(tk.pnr) + ' · ' + keep(tk.from) + ' ' + keep(tk.dep) + ' → ' + keep(tk.to) + ' ' + keep(tk.arr) + ' · ' + keep(tk.cls) + ' · ' +
@@ -79,7 +79,7 @@
     el.innerHTML = '<div class="container page bookings-page">' +
       '<div class="page-head"><div><h1>' + OT.esc(t('bk.title', 'Bookings & refunds')) + '</h1><p>' + OT.esc(t('bk.sub', 'Track status, cancel under each provider\'s policy, and follow your refund to the bank.')) + '</p></div>' +
       '<button type="button" class="btn btn-ghost btn-sm" data-ticket="">' + OT.icon('headset', 15) + OT.esc(t('bk.help', 'Raise support ticket')) + '</button></div>' +
-      (j && j.pnr && !all.some(function (b) { return b.type === 'train' && b.pnr === j.pnr; }) ? '<div class="co-ticket card-flat small bk-train">' + OT.icon('train', 18) + '<div><strong>' + OT.esc(t('co.ticket', 'Train ticket')) + ' ' + keep(j.train.no) + ' · PNR ' + keep(j.pnr) + '</strong>' +
+      (j && j.pnr && j.train && !all.some(function (b) { return b.type === 'train' && b.pnr === j.pnr; }) ? '<div class="co-ticket card-flat small bk-train">' + OT.icon('train', 18) + '<div><strong>' + OT.esc(t('co.ticket', 'Train ticket')) + ' ' + keep(j.train.no) + ' · PNR ' + keep(j.pnr) + '</strong>' +
         '<span class="xs muted">' + OT.esc(t('bk.trainNote', 'Managed on IRCTC under railway rules. Cancel or refund the ticket on IRCTC.')) + '</span></div>' + OT.badge('confirmed', t('status.cnf', 'CNF')) + '</div>' : '') +
       '<div class="tabs" role="tablist">' + tabs.map(function (tb) {
         var n = all.filter(function (b) { return tb[0] === 'all' || (tb[0] === 'active' ? b.status === 'confirmed' : b.status !== 'confirmed'); }).length;

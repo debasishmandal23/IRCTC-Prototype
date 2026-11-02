@@ -13,7 +13,7 @@
   var OT = window.OT;
   var KEY = 'onetrip.v1';
   var state = {};
-  var PERSIST = ['lang', 'user', 'journey', 'bookings', 'geminiKey', 'geminiModel', 'aiMode', 'cancellations', 'partnerListings', 'enquiries', 'tickets'];
+  var PERSIST = ['lang', 'user', 'journey', 'bookings', 'geminiKey', 'geminiModel', 'aiMode', 'cancellations', 'partnerListings', 'enquiries', 'tickets', 'sound', 'notifications'];
 
   function load() {
     try {

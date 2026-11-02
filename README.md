@@ -1,4 +1,4 @@
-# IRCTC OneTrip — AI-powered, multilingual integrated travel platform (prototype v1.1)
+# IRCTC OneTrip — AI-powered, multilingual integrated travel platform (prototype v1.2)
 
 > **One journey. One dashboard. In your language.**
 > A working prototype for **Case 13 — "How should IRCTC expand its digital travel platform?"**
@@ -41,7 +41,7 @@ There is no build step and no dependencies: plain HTML, CSS and JavaScript (clas
 
 ## 🎬 3-minute jury demo
 
-Click **Start demo** in the header. The 20-step guided tour drives the app by itself, so you only press **Next**:
+Click **Start demo** in the header. The 22-step guided tour drives the app by itself, so you only press **Next**:
 
 1. **Sign in as a persona** (`#/login`): Sunita Sharma, a family traveller from New Delhi who prefers Hindi. The language,
    home city, party of 3 and preferences load automatically.
@@ -50,14 +50,22 @@ Click **Start demo** in the header. The 20-step guided tour drives the app by it
 3. Speak (or play the sample) *"क्रिसमस पर दिल्ली से चंडीगढ़ की ट्रेन बुक करो"* → the app replies **"I heard: …"** with chips
    (Intent, From, To, Date) and opens the **train results** for that date.
 4. Book **12011 Kalka Shatabdi, CC** → passengers prefilled → fare summary → **human-in-the-loop confirm** → simulated payment →
-   **PNR + e-ticket** (CNF / RAC / WL with a chance of confirmation).
+   a Google-Pay-style **payment success** screen (amount, UPI ref, transaction ID, PNR) → **PNR + e-ticket**
+   (CNF / RAC / WL with a chance of confirmation).
 5. **"Now plan your stay in Chandigarh"** → Agent Trace: Orchestrator → Multilingual → Research → **Verification** →
    Recommendation → Itinerary. The package hotel (*Hotel Shivalik View*, partner P-101) and cab are added.
+   The **Transport** tab compares the station → hotel leg by cab, auto, bus, metro, e-rickshaw and walking, side by side
+   (*"No metro in Chandigarh"* is shown honestly).
 6. **My Journey**: the ticket is the first item on the route-line timeline. The conflict between the **11:05 arrival** and the
    **14:00 check-in** is flagged; resolve it → Trip Readiness rises.
-7. Checkout → confirm → booking refs. Assistant refund question in Hindi → 🔊 listen → escalate.
+7. Checkout → confirm → payment success with **"Your one-page itinerary"** (A4 PDF, PNG, WhatsApp, email). Assistant refund
+   question in Hindi → 🔊 listen → escalate.
 8. **Partner dashboard** shows the new booking; **Admin & Bank** shows the **long-weekend demand forecast**
    (the data-monetisation use case) and GTV; **Business case** closes the story.
+
+Not taking a train? The home widget has tabs for **Trains | Hotels | Local transport | Food | Sightseeing | Packages**:
+any service can be booked on its own and becomes a light trip in My Journey (e.g. *"Stay in Jaipur, 9–11 Nov"*), with
+**"Add a train to this trip"** any time.
 
 Try typing any route in the home box, e.g. **"book from Chandigarh to Mumbai train"**, "चंडीगढ़ से मुंबई ट्रेन कल",
 "hotel in Hyderabad", "status of my train", "refund kab milega".
@@ -70,14 +78,20 @@ Pre-demo checklist: see [`docs/VERIFICATION.md`](docs/VERIFICATION.md#jury-demo-
 
 | Interface | Route | Highlights |
 |---|---|---|
-| **Traveller** | `#/home` | **Step 1 · Find trains** (from/to station pickers, date, class, passengers), "type or speak a command" box with **I heard** chips, PNR import as a second path, sample voice queries, **For you** suggestions |
+| **Navigation** | header | Always a horizontal bar on top: Plan trip · Trains · Hotels · Transport · My Journey · Bookings & refunds, with "Partners & admin ▾" on desktop. On tablets and phones the bar scrolls sideways (icons + short labels, active tab kept in view). No hamburger list. |
+| **Traveller** | `#/home` | Tabbed booking widget: **Trains** (the main, train-first path) · **Hotels** · **Local transport** · **Food** · **Sightseeing** · **Packages**. Below it, the "type or speak" box with **I heard** chips, sample voice queries, PNR import, **For you** suggestions |
+| | `#/hotels?city=&in=&out=&guests=&rooms=&min=&max=` | Hotels on their own, with a visible **Budget per night** control (dual slider ₹500–₹15,000, min/max inputs, quick chips, live "x of y hotels within budget") |
+| | `#/transport?city=&from=&to=&date=&time=&pax=` | **Cab · auto · bus · metro · e-rickshaw · walk** side by side for any leg (station, airport, hotel, landmark typeahead): total + per-person price, time, wait/frequency, comfort, luggage, door-to-door, last-mile walk, CO₂, availability (metro only in cities that have one), Cheapest / Fastest / Best-for-your-group badges, source + checked time + verification badge |
+| | `#/food?city=`, `#/sights?city=` | Meals and entry tickets on their own |
+| | `#/itinerary-print` | **One-page itinerary**: A4 print view (Download PDF = print → Save as PDF), PNG drawn on a canvas, WhatsApp (wa.me + PNG) and email (mailto), each with DPDP consent and a confirm step; sends are logged for Admin |
 | | `#/trains?from=&to=&date=` | Simulated timetable for any of ~40 stations (typeahead in English and Indian scripts), classes, fares, availability (AVAILABLE / RAC / WL / REGRET), filters and sort, verification badge + source + checked time per train |
 | | `#/trains/book`, `#/trains/ticket?pnr=` | Passengers (persona prefilled), fare breakup, confirm, simulated payment, PNR e-ticket, "plan your stay" CTA |
 | | `#/login` | **Demo persona cards**: 4 travellers (Sunita · Delhi · Hindi, Ramesh · Chennai · Tamil pilgrim, Arjun · Pune · Marathi student, Neha · Mumbai · business), Partner P-101, Admin/Bank. The header user menu switches persona or signs out |
-| | `#/results?to=` | Any destination station (generated, deterministic listings for cities outside the three scripted scenarios). Live Agent Trace, verified hotels, cabs, food and sightseeing, source + checked time + verification badge, price comparison, read aloud |
+| | `#/results?to=` | Budget filter bar on top; the **Transport** tab compares the station → hotel leg across every mode. Any destination station (generated, deterministic listings for cities outside the three scripted scenarios). Live Agent Trace, verified hotels, cabs, food and sightseeing, source + checked time + verification badge, price comparison, read aloud |
 | | `#/journey` | **My Journey**: Trip Readiness ring with explanation, chronological route-line timeline, conflict flags and fixes |
 | | `#/checkout` | Booking and payment summary, simulated UPI/card, confirm step, confirmation |
-| | `#/bookings` | Train ticket with railway-style cancellation charge and refund, persona trip history, status tracking, policy-based cancellation, refund tracker, support tickets |
+| | Payment success | After every payment (train, standalone, journey): animated check, amount, paid to, UPI ref, transaction ID, date-time, booking refs, Done / View itinerary / Share, a soft chime (mutable), confetti off under reduced motion |
+| | `#/bookings` | Standalone hotel / transport / food / sight bookings with cancellation, train ticket with railway-style cancellation charge and refund, persona trip history, status tracking, policy-based cancellation, refund tracker, support tickets |
 | | Assistant drawer | Multilingual chat, 🎤 mic, 🔊 speaker, language switch mid-chat, "show original", human escalation |
 | **Tourism Partner** | `#/partner` | Login/registration, listings CRUD, price and availability calendar, enquiries with Partner Agent draft replies, bookings, revenue, conversion and cancellations, feedback |
 | **Admin & Bank** | `#/admin` | Users and providers, bookings and GTV, complaints, refunds and SLA, partner performance, destination demand, **long-weekend demand forecast**, financial products (escrow, T+1 settlement), language and support analytics, platform health |
@@ -141,11 +155,11 @@ Gemini is used only for language. Prices and timings always come from the verifi
 index.html              app shell (open this)
 css/                    base.css (design tokens) · traveller.css · dashboards.css
 js/core/                util · store (localStorage) · i18n (11 languages) · ui · router (hash routes)
-js/data/                travel.js (simulated catalogue) · rail.js (stations, timetable, fares, PNR) · cities.js (any-city listings) · personas.js (personas, holidays, demand) · analytics.js (simulated KPIs) · survey.js (real survey stats, N=52)
+js/data/                travel.js (simulated catalogue) · rail.js (stations, timetable, fares, PNR) · cities.js (any-city listings) · personas.js (personas, holidays, demand) · transport.js (local transport comparison) · analytics.js (simulated KPIs) · survey.js (real survey stats, N=52)
 js/services/            language.js (BHASHINI-ready layer: ASR/NMT/TTS/transliteration, simulated) · gemini.js (optional)
 js/agents/              agents.js · orchestrator.js
 js/lib/charts.js        dependency-free SVG charts
-js/views/               one file per screen
+js/views/               one file per screen (services.js = hotels/transport/food/sights, itinerary.js, payment.js, budget.js)
 js/tour.js              guided jury demo
 docs/                   ARCHITECTURE.md · VERIFICATION.md · research/ (requirements, business case, course frameworks, survey stats)
 tests/                  automated end-to-end tests (Playwright): `python3 tests/e2e.py` runs file:// and http at 1440 and 375 px

@@ -23,21 +23,11 @@
   </div>
 
   <header class="app-header">
-    <div class="container">
-      <button class="icon-btn nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="main-nav"></button>
+    <div class="container hdr-row">
       <a class="brand" href="#/home" aria-label="IRCTC OneTrip home">
         <span class="brand-mark" aria-hidden="true"></span>
         <span>IRCTC OneTrip<small data-i18n="brand.tag">One journey. One dashboard.</small></span>
       </a>
-      <nav class="main-nav" id="main-nav" aria-label="Main">
-        <a href="#/home" data-nav="home" data-i18n="nav.plan">Plan trip</a>
-        <a href="#/trains" data-nav="trains" data-i18n="nav.trains">Trains</a>
-        <a href="#/journey" data-nav="journey" data-i18n="nav.journey">My Journey</a>
-        <a href="#/bookings" data-nav="bookings" data-i18n="nav.bookings">Bookings &amp; refunds</a>
-        <a href="#/partner" data-nav="partner" data-i18n="nav.partner">Partner</a>
-        <a href="#/admin" data-nav="admin" data-i18n="nav.admin">Admin &amp; Bank</a>
-        <a href="#/insights" data-nav="insights" data-i18n="nav.insights">Business case</a>
-      </nav>
       <div class="header-tools">
         <label class="lang-select" title="Language">
           <span class="sr-only">Language</span>
@@ -51,6 +41,26 @@
         <div class="user-wrap"><button type="button" class="hdr-user" id="hdr-user" aria-haspopup="true" aria-expanded="false" aria-controls="user-menu"></button><div class="user-menu" id="user-menu" hidden></div></div>
       </div>
     </div>
+    <!-- Primary navigation: always a horizontal bar (scrolls sideways on small screens); never a vertical hamburger list. -->
+    <nav class="main-nav" id="main-nav" aria-label="Main">
+      <div class="container nav-row" id="nav-row">
+        <a href="#/home" data-nav="home"><span class="nav-ic" data-ic="route"></span><span data-i18n="nav.plan">Plan trip</span></a>
+        <a href="#/trains" data-nav="trains"><span class="nav-ic" data-ic="train"></span><span data-i18n="nav.trains">Trains</span></a>
+        <a href="#/hotels" data-nav="hotels"><span class="nav-ic" data-ic="hotel"></span><span data-i18n="nav.hotels">Hotels</span></a>
+        <a href="#/transport" data-nav="transport"><span class="nav-ic" data-ic="bus"></span><span data-i18n="nav.transport">Transport</span></a>
+        <a href="#/journey" data-nav="journey"><span class="nav-ic" data-ic="layers"></span><span data-i18n="nav.journey">My Journey</span></a>
+        <a href="#/bookings" data-nav="bookings"><span class="nav-ic" data-ic="refund"></span><span class="nl-long" data-i18n="nav.bookings">Bookings &amp; refunds</span><span class="nl-short" data-i18n="nav.bookingsShort">Bookings</span></a>
+        <span class="nav-sep" aria-hidden="true"></span>
+        <div class="nav-more" id="nav-more">
+          <button type="button" class="nav-more-btn" id="nav-more-btn" aria-haspopup="true" aria-expanded="false" aria-controls="nav-more-menu"><span class="nav-ic" data-ic="store"></span><span data-i18n="nav.more">Partners &amp; admin</span><span class="nav-chev" data-ic="chevronDown"></span></button>
+          <div class="nav-more-menu" id="nav-more-menu">
+            <a href="#/partner" data-nav="partner"><span class="nav-ic" data-ic="store"></span><span data-i18n="nav.partner">Partner</span></a>
+            <a href="#/admin" data-nav="admin"><span class="nav-ic" data-ic="bank"></span><span data-i18n="nav.admin">Admin &amp; Bank</span></a>
+            <a href="#/insights" data-nav="insights"><span class="nav-ic" data-ic="chart"></span><span data-i18n="nav.insights">Business case</span></a>
+          </div>
+        </div>
+      </div>
+    </nav>
   </header>
 
   <main id="view" tabindex="-1"></main>
@@ -79,6 +89,7 @@
   <script src="js/data/rail.js"></script>
   <script src="js/data/cities.js"></script>
   <script src="js/data/personas.js"></script>
+  <script src="js/data/transport.js"></script>
   <script src="js/data/analytics.js"></script>
   <script src="js/data/survey.js"></script>
 
@@ -90,13 +101,17 @@
   <script src="js/agents/orchestrator.js"></script>
 
   <script src="js/views/shell.js"></script>
+  <script src="js/views/budget.js"></script>
+  <script src="js/views/payment.js"></script>
   <script src="js/views/foryou.js"></script>
   <script src="js/views/home.js"></script>
   <script src="js/views/results.js"></script>
   <script src="js/views/trains.js"></script>
+  <script src="js/views/services.js"></script>
   <script src="js/views/journey.js"></script>
   <script src="js/views/checkout.js"></script>
   <script src="js/views/bookings.js"></script>
+  <script src="js/views/itinerary.js"></script>
   <script src="js/views/assistant.js"></script>
   <script src="js/views/auth.js"></script>
   <script src="js/views/settings.js"></script>

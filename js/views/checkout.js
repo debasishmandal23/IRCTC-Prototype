@@ -28,9 +28,9 @@
 
   function lineHTML(r, j) {
     var i = r.it, x = r.x, l = r.l;
-    var qty = l.qty > 1 ? keep(OT.inr(l.unit)) + ' × ' + l.qty + ' ' + OT.esc({ night: t('co.nights', 'nights'), person: t('co.persons', 'persons'), bag: t('co.bags', 'bags') }[l.basis] || '') : '';
+    var qty = l.qty > 1 ? keep(OT.inr(l.unit)) + ' × ' + l.qty + ' ' + OT.esc({ night: i.rooms > 1 ? t('co.roomNights', 'room-nights') : t('co.nights', 'nights'), person: t('co.persons', 'persons'), bag: t('co.bags', 'bags') }[l.basis] || '') : '';
     return '<li class="co-line' + (r.blocked ? ' blocked' : '') + '" data-line="' + i.id + '">' +
-      '<span class="offer-ic">' + OT.icon(x.service ? 'lock' : i.type, 18) + '</span>' +
+      '<span class="offer-ic">' + OT.icon(OT.itemIcon(x, i.type), 18) + '</span>' +
       '<div class="co-what"><strong>' + OT.esc(i.title) + '</strong><span class="xs muted">' + OT.esc(x.provider || '') + ' · ' + (i.when ? keep(OT.fmtDate(i.when)) + ' ' + keep(i.when.slice(11, 16)) : '') + '</span>' +
       '<span class="xs muted">' + OT.esc(t('co.refundOwner', 'Refund owner: {p}', { p: x.provider || '' })) + ' · ' + OT.lang.highlight(OT.agents.policyText(x.policy)) + '</span>' +
       (l.early ? '<span class="xs">' + OT.lang.highlight(t('co.early', 'Early check-in request {fee} (charged only if the hotel confirms)', { fee: OT.inr(l.early) })) + '</span>' : '') +
@@ -52,10 +52,12 @@
       '<a class="btn btn-ghost btn-sm" href="#/journey">' + OT.icon('arrowLeft', 15) + OT.esc(t('co.back', 'Back to My Journey')) + '</a></div>' +
       '<div class="co-grid">' +
       '<div class="card co-items" data-tour="co-items"><div class="card-head"><h2 class="h3">' + OT.esc(t('co.summary', 'Booking summary')) + '</h2>' + OT.simTag() + '</div>' +
+      (!j.train ? '<div class="co-ticket small co-trip">' + OT.icon('route', 18) + '<div><strong>' + OT.esc(OT.trip.title(j)) + '</strong><span class="xs muted"><bdi class="keep">' + OT.esc(OT.fmtDate(j.start)) + (j.end && j.end !== j.start ? ' – ' + OT.esc(OT.fmtDate(j.end)) : '') + '</bdi> · ' + OT.esc(t('trip.noTrainShort', 'no train in this trip')) + '</span></div>' +
+        '<div class="co-amt"><a class="xs" href="#/journey">' + OT.esc(t('trip.addTrain', 'Add a train to this trip')) + '</a></div></div>' :
       '<div class="co-ticket small">' + OT.icon('train', 18) + '<div><strong>' + OT.esc(t('co.ticket', 'Train ticket')) + ' ' + keep(j.train.no) + ' · PNR ' + keep(j.pnr) + '</strong>' +
       '<span class="xs muted">' + keep(j.train.from) + ' ' + keep(j.train.dep) + ' → ' + keep(j.train.to) + ' ' + keep(j.train.arr) + ' · ' + keep(OT.fmtDate(j.train.date)) + '</span></div>' +
       (j.train.status === 'PLANNED' ? '<div class="co-amt">' + OT.badge('pending', t('trip.notBooked', 'Not booked yet')) + '<a class="xs" href="#/' + OT.trains.path({ from: j.train.from, to: j.train.to, date: j.train.date, pax: j.passengers }) + '">' + OT.esc(t('trip.bookNow', 'Book this train')) + '</a></div></div>' :
-      '<div class="co-amt"><span>' + keep(OT.inr(j.train.fare)) + '</span>' + OT.badge('confirmed', t('co.paidIrctc', 'Paid on IRCTC')) + '<span class="xs muted">' + OT.esc(t('co.notCharged', 'Not charged again')) + '</span></div></div>') +
+      '<div class="co-amt"><span>' + keep(OT.inr(j.train.fare)) + '</span>' + OT.badge('confirmed', t('co.paidIrctc', 'Paid on IRCTC')) + '<span class="xs muted">' + OT.esc(t('co.notCharged', 'Not charged again')) + '</span></div></div>')) +
       '<ul class="co-lines">' + rows.map(function (r) { return lineHTML(r, j); }).join('') + '</ul>' +
       '<div class="co-totals small">' +
       '<div><span>' + OT.esc(t('co.subtotal', 'OneTrip services')) + '</span>' + keep(OT.inr(total)) + '</div>' +
@@ -85,7 +87,7 @@
       '<div class="conf-head">' + OT.icon('checkCircle', 44) + '<div><h1 class="h2">' + OT.esc(t('co.confirmed', 'Booking confirmed (simulated)')) + '</h1>' +
       '<p class="muted">' + OT.lang.highlight(t('co.txn', 'Transaction {txn} · {amt} · {method}', { txn: c.txn, amt: OT.inr(c.total), method: c.method })) + '</p></div></div>' +
       '<ul class="conf-list">' + c.bookings.map(function (b) {
-        return '<li>' + OT.icon(b.type, 18) + '<div><strong>' + OT.esc(b.title) + '</strong><span class="xs muted">' + OT.esc(b.provider || '') + (b.partnerId ? ' · ' + keep(b.partnerId) : '') + '</span></div>' +
+        return '<li>' + OT.icon(OT.itemIcon(D().get(b.refId), b.type), 18) + '<div><strong>' + OT.esc(b.title) + '</strong><span class="xs muted">' + OT.esc(b.provider || '') + (b.partnerId ? ' · ' + keep(b.partnerId) : '') + '</span></div>' +
           '<span class="keep-ref">' + keep(b.ref) + '</span>' + keep(OT.inr(b.amount)) + OT.badge('confirmed') + '</li>';
       }).join('') + '</ul>' +
       (c.partners.length ? '<p class="small conf-partner">' + OT.icon('store', 15) + ' ' + OT.esc(t('co.partnerNotified', 'Partners notified: {list}. The booking now appears in their dashboard.', { list: c.partners.join(', ') })) + '</p>' : '') +
@@ -104,7 +106,8 @@
     var total = rows.reduce(function (s, r) { return s + r.l.amount; }, 0);
     var m = METHODS[method];
     var cl = [
-      OT.esc(t('co.cTrip', 'Trip')) + ': ' + keep(j.train.no) + ' · PNR ' + keep(j.pnr) + ' · ' + keep(j.train.from) + ' → ' + keep(j.train.to) + ' · ' + keep(OT.fmtDate(j.train.date))
+      j.train ? OT.esc(t('co.cTrip', 'Trip')) + ': ' + keep(j.train.no) + ' · PNR ' + keep(j.pnr) + ' · ' + keep(j.train.from) + ' → ' + keep(j.train.to) + ' · ' + keep(OT.fmtDate(j.train.date))
+        : OT.esc(t('co.cTrip', 'Trip')) + ': ' + OT.esc(OT.trip.title(j)) + ' · ' + keep(OT.fmtDate(j.start))
     ].concat(rows.map(function (r) { return OT.esc(r.it.title) + ': ' + keep(OT.inr(r.l.amount)) + (r.it.when ? ' · ' + keep(OT.fmtDate(r.it.when)) + ' ' + keep(r.it.when.slice(11, 16)) : ''); }))
       .concat([OT.esc(t('co.cTotal', 'Total')) + ': <strong>' + keep(OT.inr(total)) + '</strong> · ' + OT.esc(t(m.key, m.en))]);
     busy = true;
@@ -116,6 +119,7 @@
       confirmLabel: t('co.cOk', 'Confirm & pay {amt}', { amt: OT.inr(total) })
     }).then(function (ok) {
       if (!ok) { busy = false; return false; }
+      OT.state.payPending = true;
       var btn = root && root.querySelector('#pay-btn');
       if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> ' + OT.esc(t('co.processing', 'Re-verifying prices and authorising (simulated)…')); }
       return OT.sleep(1100).then(function () {
@@ -126,7 +130,7 @@
           jj.items.forEach(function (i) {
             if (i.status !== 'selected') return;
             var x = D().get(i.refId) || {}, l = OT.agents.lineFor(i, jj);
-            var ref = 'OT-' + (PREFIX[i.type] || 'SVC') + '-' + code5();
+            var ref = 'OT-' + (x.mode ? 'LTR' : PREFIX[i.type] || 'SVC') + '-' + code5();
             i.status = 'confirmed'; i.bookingRef = ref; i.verification = 'verified'; i.paidAt = now;
             created.push({ ref: ref, journeyId: jj.id, itemId: i.id, refId: i.refId, type: i.type, partnerId: i.partnerId, title: i.title, provider: x.provider,
               amount: l.amount, gst: l.gst, status: 'confirmed', paidAt: now, method: m.en, city: i.city || jj.scenario,
@@ -140,6 +144,12 @@
         busy = false;
         OT.emit('booking:confirmed', OT.state.lastCheckout);
         if (root) render(root);
+        var to = created.map(function (b) { return b.provider; }).filter(function (v, k, a) { return v && a.indexOf(v) === k; });
+        OT.paySuccess.show({
+          amount: total, method: m.en, txn: txn, at: now, viewHref: 'journey',
+          paidTo: 'IRCTC OneTrip' + (to.length ? ' · ' + (to.length > 2 ? t('ps2.nProviders', '{n} providers', { n: to.length }) : to.join(', ')) : ''),
+          refs: created.map(function (b) { return { icon: OT.itemIcon(D().get(b.refId), b.type), label: b.title, ref: b.ref }; })
+        });
         return true;
       });
     });

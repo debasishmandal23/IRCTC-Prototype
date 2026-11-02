@@ -72,7 +72,19 @@
     filter: '<path d="M4 5h16l-6 8v6l-4-2v-4L4 5Z"/>',
     refresh: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>',
     leaf: '<path d="M5 19c0-9 6-14 15-14 0 9-5 15-14 15"/><path d="M5 19 13 11"/>',
-    temple: '<path d="M12 2v3M8 9h8l-1-4H9L8 9ZM5 21V12h14v9M3 21h18M9 21v-5h6v5M6 12l1-3h10l1 3"/>'
+    temple: '<path d="M12 2v3M8 9h8l-1-4H9L8 9ZM5 21V12h14v9M3 21h18M9 21v-5h6v5M6 12l1-3h10l1 3"/>',
+    bus: '<rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 10h16M8 18v3M16 18v3M7.5 14h.01M16.5 14h.01M9 6h6"/>',
+    metro: '<rect x="5" y="3" width="14" height="14" rx="4"/><path d="M5 10h14M9 17l-3 4M15 17l3 4M9 13.5h.01M15 13.5h.01M10 6.5h4"/>',
+    auto: '<path d="M4 17V9a4 4 0 0 1 4-4h6l4 5h1a1 1 0 0 1 1 1v6"/><path d="M4 10h10V5M14 10h6"/><circle cx="7" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/>',
+    walk: '<circle cx="13" cy="4" r="2"/><path d="m9 21 2-6 3 2v4M8 12l2-4 4 1 2 3 3 1M11 15l-1-3"/>',
+    share: '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.5M8.2 13.2l7.6 4.5"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+    whatsapp: '<path d="M4 20l1.3-3.9A8 8 0 1 1 8 19l-4 1Z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1.2-1.4-2-1-1 .8c-.9-.4-1.7-1.2-2.1-2.1l.8-1-1-2L9 9.5Z"/>',
+    qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+    printer: '<path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="9" rx="2"/><path d="M7 14h10v7H7z"/>',
+    mute: '<path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="m17 9 5 6M22 9l-5 6"/>',
+    leafSm: '<path d="M6 18c0-7 5-11 12-11 0 7-4 12-11 12"/>'
   };
 
   OT.icon = function (name, size, cls) {
@@ -80,6 +92,13 @@
     return '<svg class="ic ' + (cls || '') + '" width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (P[name] || P.info) + '</svg>';
   };
   OT.iconNames = Object.keys(P);
+  /** Icon for a catalogue item / booking: local-transport legs show their mode (bus, metro, auto, walk). */
+  OT.itemIcon = function (x, type) {
+    x = x || {};
+    if (x.service) return 'lock';
+    if (x.mode) return { cab: 'cab', auto: 'auto', erick: 'auto', bus: 'bus', metro: 'metro', walk: 'walk' }[x.mode] || 'cab';
+    return x.type || type || 'info';
+  };
 
   var BADGES = {
     verified: { cls: 'b-ok', icon: 'checkCircle', label: 'Verified' },

@@ -296,6 +296,7 @@
       confirmLabel: t('co.cOk', 'Confirm & pay {amt}', { amt: OT.inr(total) })
     }).then(function (ok) {
       if (!ok) { busy = false; return false; }
+      OT.state.payPending = true;
       var b = root && root.querySelector('#trn-pay');
       if (b) { b.disabled = true; b.innerHTML = '<span class="spinner"></span> ' + OT.esc(t('trn.processing', 'Booking on the simulated IRCTC gateway…')); }
       return OT.sleep(900).then(function () {
@@ -305,7 +306,13 @@
         var pp = q.pkg && OT.state.pendingPackage, nights = pp ? pp.nights : 2;
         // the traveller may pick a different date than the package suggested: the stay still ends on the package's return date
         if (pp && pp.ret) nights = Math.max(1, Math.round((R().parseYmd(pp.ret) - R().parseYmd(tk.arrDate)) / 86400000));
+        var prev = OT.store.get('journey');
         var j = D().journeyFromTicket(tk, { nights: nights });
+        // "Add a train to this trip": a standalone trip to the same city keeps its hotel, transport, food and sights
+        if (prev && !prev.train && prev.kind === 'trip' && prev.scenario === tk.to) {
+          j.items = (prev.items || []).slice(); j.budget = prev.budget || j.budget; j.budgetMin = prev.budgetMin; j.id = prev.id;
+          if (prev.end) j.nights = Math.max(1, Math.round((R().parseYmd(prev.end) - R().parseYmd(tk.arrDate)) / 86400000)) || j.nights;
+        }
         OT.store.set('journey', j);
         var u = OT.store.get('user') || {};
         OT.store.update('bookings', function (l) {
@@ -316,6 +323,11 @@
         OT.state.lastRun = null; OT.state.lastCheckout = null; bookState = null; busy = false;
         OT.emit('train:booked', tk);
         OT.go('trains/ticket?pnr=' + tk.pnr);
+        OT.paySuccess.show({
+          amount: tk.total, method: method === 'card' ? 'Card (simulated)' : 'UPI (simulated)', txn: tk.txn, at: tk.bookedAt, viewHref: 'journey',
+          paidTo: t('ps2.irctc', 'IRCTC (simulated gateway) via OneTrip'),
+          refs: [{ icon: 'train', label: tk.no + ' ' + tk.name + ' · ' + tk.status, ref: 'PNR ' + tk.pnr }, { icon: 'checkCircle', label: t('ps2.bookingRef', 'OneTrip booking ref'), ref: ref }]
+        });
         return tk;
       });
     });
@@ -327,6 +339,7 @@
     var b = findBooking(q.pnr);
     if (!b) { el.innerHTML = '<div class="container page"><div class="card empty-state">' + OT.icon('train', 30) + '<p>' + OT.esc(t('trn.noTicket', 'Ticket not found in this browser.')) + '</p><a class="btn btn-primary" href="#/trains">' + OT.esc(t('trn.title', 'Find trains')) + '</a></div></div>'; return; }
     var tk = b.ticket, cancelled = b.status !== 'confirmed';
+    var jr = OT.store.get('journey'); if (jr && jr.pnr !== tk.pnr) jr = null;
     var city = sname(tk.to);
     var st = tk.status === 'CNF' ? 'confirmed' : tk.status === 'REGRET' ? 'unavailable' : 'pending';
     el.innerHTML = '<div class="container page trains-ticket">' +
@@ -348,10 +361,12 @@
         '<p class="xs muted">' + OT.esc(t('trn.chanceNote', 'Based on waitlist position, days to travel and long-weekend demand. If it stays waitlisted at chart preparation, the fare is refunded automatically (railway rules).')) + '</p></div>' : '') +
       '</div>' +
       (cancelled ? '' : '<div class="card plan-next" data-tour="plan-next"><div><h2 class="h3">' + OT.icon('route', 18) + ' ' + OT.esc(t('trn.nextTitle', 'Step 3 · Your train is in My Journey')) + '</h2>' +
-        '<p class="small muted">' + OT.esc(t('trn.nextSub', 'AI agents can now research and verify a hotel, station cab, food and sights around your arrival at {arr} in {city}.', { arr: tk.arr, city: city })) + '</p></div>' +
+        '<p class="small muted">' + OT.esc(t('trn.nextSub', 'AI agents can now research and verify a hotel, station cab, food and sights around your arrival at {arr} in {city}.', { arr: tk.arr, city: city })) + '</p>' +
+        OT.budget.html({ id: 'pb', lo: (jr && jr.budgetMin) || OT.budget.MIN, hi: (jr && jr.budget) || 3000, count: false }) + '</div>' +
         '<a class="btn btn-accent btn-lg" id="plan-stay" href="#/results?to=' + tk.to + '">' + OT.icon('spark', 18) + OT.esc(t('trn.planStay', 'Now plan your stay & travel in {city}', { city: city })) + '</a></div>') +
       '<div class="row-wrap mt12"><a class="btn btn-ghost" href="#/journey">' + OT.icon('route', 16) + OT.esc(t('nav.journey', 'My Journey')) + '</a><a class="btn btn-ghost" href="#/bookings">' + OT.esc(t('nav.bookings', 'Bookings & refunds')) + '</a>' +
       '<button type="button" class="btn btn-ghost" onclick="window.print()">' + OT.esc(t('journey.print', 'Print')) + '</button></div></div>';
+    OT.budget.bind(el, 'pb', function (lo, hi) { OT.store.update('journey', function (x) { if (x && x.pnr === tk.pnr) { x.budget = hi; x.budgetMin = lo; } return x; }); });
     var ps = el.querySelector('#plan-stay');
     if (ps) ps.addEventListener('click', function () {
       var pk = OT.state.pendingPackage;
