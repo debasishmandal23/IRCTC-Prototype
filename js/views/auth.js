@@ -56,7 +56,7 @@
     var on = u && u.personaId === p.id;
     var L = OT.i18n.lang(), lang = OT.lang.info(p.lang);
     var home = p.homeCity ? OT.data.travel.stationName(p.homeCity, L) : (p.partnerId ? 'Chandigarh' : 'New Delhi');
-    return '<article class="ps-card' + (on ? ' on' : '') + '" data-persona-card="' + p.id + '">' +
+    return '<article class="login-persona' + (on ? ' on' : '') + '" data-persona-card="' + p.id + '">' +
       '<div class="ps-top"><span class="avatar-ini big">' + OT.esc(p.name.split(' ').map(function (w) { return w.charAt(0); }).join('').slice(0, 2)) + '</span>' +
       '<div><strong>' + OT.esc(p.name) + '</strong><span class="xs muted">' + OT.esc(t(p.segKey, p.seg)) + '</span></div></div>' +
       '<dl class="ps-meta xs"><div><dt>' + OT.esc(t('um.home', 'Home city')) + '</dt><dd>' + OT.esc(home) + (p.homeCity && home.indexOf(p.homeCity) < 0 ? ' <bdi class="keep">' + p.homeCity + '</bdi>' : '') + '</dd></div>' +

@@ -113,8 +113,13 @@
       '<p>' + OT.esc(sub) + '</p></div><a class="btn btn-ghost btn-sm" href="#/trains">' + OT.icon('train', 15) + OT.esc(t('svc.orTrain', 'Or start with a train')) + '</a></div>';
   }
   function inTrip(refId) { var j = OT.store.get('journey'); return j && (j.items || []).filter(function (i) { return i.refId === refId && i.status !== 'cancelled'; })[0]; }
-  function tripNote() {
+  function tripNote(city) {
     var j = OT.store.get('journey'); if (!j) return '';
+    if (city && j.scenario !== city) {
+      // the searched city differs from the current trip: say what will happen instead of claiming the booking attaches to it
+      return '<div class="trip-note card-flat small" data-trip-other>' + OT.icon('route', 16) + '<span>' + OT.esc(t('svc.otherTrip', 'Your current trip is to {old}. Booking in {city} starts a new trip “{trip}”; we ask before replacing anything, and paid bookings stay in Bookings & refunds.', { old: sname(j.scenario), city: sname(city), trip: t('trip.stayIn', 'Stay in {city}', { city: sname(city) }) })) +
+        '</span><a class="btn btn-ghost btn-sm" href="#/journey">' + OT.esc(t('nav.journey', 'My Journey')) + '</a></div>';
+    }
     var n = (j.items || []).filter(function (i) { return i.status === 'selected'; }).length;
     return '<div class="trip-note card-flat small">' + OT.icon('route', 16) + '<span>' + OT.esc(j.train ? t('svc.attachTrain', 'Bookings here attach to your journey to {city} (train {no}).', { city: sname(j.scenario), no: j.train.no }) : t('svc.attachTrip', 'Bookings here attach to your trip “{trip}”.', { trip: tripTitle(j) })) +
       (n ? ' ' + OT.esc(t('svc.unpaid', '{n} item(s) waiting to be paid.', { n: n })) : '') + '</span><a class="btn btn-ghost btn-sm" href="#/journey">' + OT.esc(t('nav.journey', 'My Journey')) + '</a>' +
@@ -144,7 +149,7 @@
     var r = OT.budget.norm(q.min || 500, q.max || u.budget || 15000), lo = r[0], hi = r[1];
     var all = verifiedFor(city, 'hotel');
     el.innerHTML = '<div class="container page svc-page">' + headHTML('hotel', t('svc.hotelsIn', 'Hotels in {city}', { city: sname(city) }), t('svc.hotelsSub', 'Every price and rating is re-checked at the provider, with source and check time. Set your budget per night below.')) +
-      tripNote() +
+      tripNote(city) +
       '<form class="card svc-form" id="svc-form" novalidate data-tour="svc-hotel-form"><div class="svc-grid">' + cityPicker('sv-city', city) +
       '<div class="field"><label for="sv-in">' + OT.esc(t('svc.checkin', 'Check-in')) + '</label><input id="sv-in" class="input" type="date" min="' + today() + '" value="' + cin + '"></div>' +
       '<div class="field"><label for="sv-out">' + OT.esc(t('svc.checkout', 'Check-out')) + '</label><input id="sv-out" class="input" type="date" min="' + plus(today(), 1) + '" value="' + cout + '"></div>' +
@@ -279,7 +284,7 @@
     var pax = Math.max(1, Math.min(9, +q.pax || (u.party ? u.party.length : 2)));
     var cmp = TX().compare({ city: city, from: from, to: to, date: date, time: time, pax: pax, persona: persona() || u });
     el.innerHTML = '<div class="container page svc-page">' + headHTML('cab', t('tx.pageTitle', 'Local transport in {city}', { city: sname(city) }), t('tx.pageSub', 'Cab, auto, bus, metro and e-rickshaw compared side by side for your group, with honest availability.')) +
-      tripNote() +
+      tripNote(city) +
       '<form class="card svc-form" id="tx-form" novalidate data-tour="svc-tx-form"><div class="svc-grid tx-form-grid">' + cityPicker('tx-city', city) +
       placePicker('tx-from', city, from, t('search.from', 'From')) + placePicker('tx-to', city, to, t('search.to', 'To')) +
       '<div class="field"><label for="tx-date">' + OT.esc(t('search.date', 'Travel date')) + '</label><input id="tx-date" class="input" type="date" min="' + today() + '" value="' + date + '"></div>' +
@@ -315,7 +320,7 @@
     var isFood = type === 'food';
     el.innerHTML = '<div class="container page svc-page">' + headHTML(type, isFood ? t('svc.foodIn', 'Food in {city}', { city: sname(city) }) : t('svc.sightsIn', 'Sightseeing in {city}', { city: sname(city) }),
       isFood ? t('svc.foodSub', 'Restaurant tables and meals near the station, verified at source.') : t('svc.sightsSub', 'Entry tickets and tours with fees checked at the counter source.')) +
-      tripNote() +
+      tripNote(city) +
       '<form class="card svc-form" id="sf-form" novalidate><div class="svc-grid sf-grid">' + cityPicker('sf-city', city) +
       '<div class="field"><label for="sf-date">' + OT.esc(t('search.date', 'Travel date')) + '</label><input id="sf-date" class="input" type="date" min="' + today() + '" value="' + date + '"></div>' +
       '<div class="field"><label for="sf-guests">' + OT.esc(t('svc.guests', 'Guests')) + '</label><select id="sf-guests" class="input">' + [1, 2, 3, 4, 5, 6, 7, 8].map(function (n) { return '<option' + (n === guests ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select></div></div>' +
