@@ -410,6 +410,9 @@ def tour(pg, tag, exit_mid=False):
         ov = pg.ev('() => { const a = document.querySelector(".tour-card").getBoundingClientRect(), s = document.querySelector(".tour-spot").getBoundingClientRect(); const x = Math.max(0, Math.min(a.right, s.right) - Math.max(a.left, s.left)), y = Math.max(0, Math.min(a.bottom, s.bottom) - Math.max(a.top, s.top)); return s.width * s.height ? x * y / (s.width * s.height) : 0; }')
         if pg.vp == 'desktop':
             check('tour step %d card does not hide its target (overlap %.0f%%)' % (i + 1, ov * 100), ov < 0.35, ov)
+        if pg.vp == 'mobile' and pg.ev('() => !!document.querySelector(".ps-overlay.show")'):
+            cov = pg.ev('() => { const c = document.querySelector(".tour-card").getBoundingClientRect(), s = document.querySelector(".tour-spot").getBoundingClientRect(); return { spotTop: s.top, cardTop: c.top, spotBottom: s.bottom }; }')
+            check('tour step %d (phone, payment pop-up): highlighted part is above the tour card' % (i + 1), cov['spotTop'] < cov['cardTop'] - 40, cov)
         check('tour step %d card in viewport' % (i + 1), box[0] >= 0 and box[1] >= 0 and box[2] <= box[4] + 1 and box[3] <= box[5] + 1, box)
         if SHOTS and not exit_mid:
             p.screenshot(path=str(SHOTS / ('tour-%02d-%s.png' % (i + 1, tag))))
@@ -1086,6 +1089,7 @@ def v12_flow(browser, base, vp):
     check('payment pop-up: animated check circle (SVG) present', p.locator('.ps-check svg .ps-circle').count() == 1 and p.locator('.ps-check svg .ps-tick').count() == 1)
     rm = pg.ev('() => { const e = document.querySelector(".ps-circle"); return getComputedStyle(e).animationName; }')
     check('payment pop-up: check is animated (normal motion)', rm and rm != 'none', rm)
+    p.wait_for_function('() => { const o = document.querySelector(".ps-overlay"); return o && getComputedStyle(o).opacity === "1" && getComputedStyle(o.querySelector(".ps-card")).transform === "none"; }', timeout=5000); p.wait_for_timeout(900)  # settled, not mid-fade
     pg.scan('payment success ' + tag, 'pay-success-' + tag)
     p.click('[data-ps-done]'); p.wait_for_timeout(300)
     check('Done closes the pop-up; confirmation stays', p.locator('.ps-overlay').count() == 0 and p.locator('[data-tour="confirmation"]').count() == 1)
@@ -1215,6 +1219,132 @@ def v12_flow(browser, base, vp):
     ctx.close()
 
 
+
+
+# ---------------------------------------------------------------- independent v1.2 verification (verifier-owned)
+def v12_verify(browser, base, vp):
+    pg = Page(browser, base, vp)
+    p = pg.p
+    pg.go('home'); pg.ev('() => localStorage.clear()'); p.reload(); p.wait_for_function('() => window.OT && OT.router.current()')
+    # class collision: login persona cards vs payment card
+    pg.go('login', 300)
+    lp = pg.ev('() => { const c = document.querySelector("[data-persona-card]"), s = getComputedStyle(c); return { cls: c.className, align: s.textAlign, tr: s.transform, w: c.getBoundingClientRect().width }; }')
+    check('login persona card unaffected by the payment card styles (left-aligned, no transform)', 'ps-card' not in lp['cls'] and lp['align'] in ('left', 'start') and lp['tr'] == 'none', lp)
+    # phone nav: the four requested tabs always on screen, in 4 scripts, no hamburger, no page overflow
+    for lang in ['en', 'hi', 'ta', 'ml']:
+        pg.ev('l => OT.i18n.setLang(l)', lang); pg.go('journey', 300)
+        r = pg.ev('''() => { const out = []; ['home','trains','journey','bookings'].forEach(k => { const a = document.querySelector('#main-nav a[data-nav="' + k + '"]'), b = a.getBoundingClientRect();
+            if (!(b.left >= -1 && b.right <= innerWidth + 1 && b.width > 20)) out.push(k + '@' + Math.round(b.left)); if (a.scrollHeight > a.clientHeight + 2) out.push(k + ':clipped'); });
+            const tog = document.querySelector('#nav-toggle'); return { out, tog: !!(tog && tog.offsetWidth), sw: document.documentElement.scrollWidth, w: innerWidth }; }''')
+        check('nav [%s] %s: Plan trip, Trains, My Journey, Bookings visible on top, no hamburger, no overflow' % (lang, vp), not r['out'] and not r['tog'] and r['sw'] <= r['w'], r)
+        if lang in ('en', 'ml'):
+            p.screenshot(path=str(SHOTS / ('v12-nav-%s-%s.png' % (lang, vp))), clip={'x': 0, 'y': 0, 'width': VIEWPORTS[vp][0], 'height': 240}) if SHOTS else None
+    pg.ev('() => OT.i18n.setLang("en")')
+    if vp == 'desktop':
+        pg.go('home', 300)
+        b = p.locator('#nav-more-btn'); b.focus(); p.keyboard.press('ArrowDown'); p.wait_for_timeout(150)
+        f = pg.ev('() => document.activeElement.closest("#nav-more-menu") ? document.activeElement.getAttribute("href") : null')
+        check('"Partners & admin": ArrowDown opens the menu and focuses the first item', f == '#/partner' and b.get_attribute('aria-expanded') == 'true', f)
+        p.keyboard.press('ArrowDown'); p.wait_for_timeout(80)
+        check('"Partners & admin": ArrowDown moves to the next item', pg.ev('() => document.activeElement.getAttribute("href")') == '#/admin')
+        p.keyboard.press('Escape'); p.wait_for_timeout(120)
+        check('"Partners & admin": Escape closes and returns focus to the button', b.get_attribute('aria-expanded') == 'false' and pg.ev('() => document.activeElement.id') == 'nav-more-btn')
+    # standalone hotel in Jaipur (generated city), pay, pop-up final state
+    pg.go('hotels?city=JP', 400)
+    p.click('[data-bud-chip="1"]'); p.wait_for_timeout(300)
+    p.locator('[data-book-now]').first.click(); p.wait_for_selector('#pay-btn')
+    for bb in p.locator('[data-recheck-line]').all():
+        bb.click(); p.wait_for_timeout(900)
+    for cb in p.locator('[data-accept]').all():
+        cb.check(); p.wait_for_timeout(150)
+    check('standalone checkout: pay enabled after re-check / accepting the new price', p.is_enabled('#pay-btn'))
+    p.click('#pay-btn'); pg.modal_ok(keep_success=True)
+    try:
+        p.wait_for_selector('.ps-overlay.show', timeout=8000)
+    except Exception:
+        if SHOTS: p.screenshot(path=str(SHOTS / ('DEBUG-pay-%s.png' % vp)))
+        print('DEBUG errors', pg.errors[:5]); print('DEBUG', pg.ev('() => [location.hash, !!document.querySelector(".ps-overlay"), document.querySelector(".ps-overlay") && document.querySelector(".ps-overlay").className, document.body.className, (document.querySelector("#view")||{}).innerText.slice(0,200)]'))
+        raise
+    p.wait_for_timeout(1500)
+    ov = pg.ev('''() => { const o = document.querySelector('.ps-overlay'), c = o.querySelector('.ps-card'); return { op: getComputedStyle(o).opacity, cop: getComputedStyle(c).opacity, bg: getComputedStyle(c).backgroundColor, tr: getComputedStyle(c).transform, disp: getComputedStyle(c).display }; }''')
+    check('payment pop-up fully shown: overlay + card opaque, white card, settled (no mid-fade)', ov['op'] == '1' and ov['cop'] == '1' and ov['bg'] == 'rgb(255, 255, 255)' and ov['tr'] in ('none', 'matrix(1, 0, 0, 1, 0, 0)'), ov)
+    paid = pg.ev('() => +document.querySelector(".ps-amount").innerText.replace(/[^0-9]/g, "")')
+    if SHOTS:
+        p.screenshot(path=str(SHOTS / ('v12-pay-%s.png' % vp)))
+    reach = pg.ev('''() => ['[data-ps-done]','[data-ps-view]','[data-ps-share]','[data-it="pdf"]','[data-it="wa"]','[data-it="mail"]'].map(s => { const e = document.querySelector(s); e.scrollIntoView({block: 'nearest'}); const r = e.getBoundingClientRect(), t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !!(t && e.contains(t)); })''')
+    check('pop-up buttons reachable at %s (Done, View itinerary, Share, PDF, WhatsApp, Email)' % vp, all(reach), reach)
+    p.click('[data-ps-sound]'); p.wait_for_timeout(150)
+    p.click('[data-ps-done]'); p.wait_for_timeout(300)
+    # reload: generated-city listing must still resolve (nights x price), mute persists
+    p.reload(); p.wait_for_function('() => window.OT && OT.router.current()'); p.wait_for_timeout(300)
+    check('mute persists after reload', pg.ev('() => OT.store.get("sound")') == 'off')
+    cost = pg.ev('() => { const j = OT.store.get("journey"); return j.items.filter(i => i.status !== "cancelled").reduce((s, i) => s + OT.agents.lineFor(i, j).amount, 0); }')
+    check('after reload the Jaipur stay still costs what was paid (%s = %s)' % (cost, paid), cost == paid, [cost, paid])
+    pg.go('journey', 400)
+    check('My Journey trip cost after reload shows the paid amount', pg.ev('n => OT.inr(n)', paid) in p.inner_text('.cost'), p.inner_text('.cost')[:200])
+    # other-city banner + ask before replacing
+    pg.go('transport?city=NDLS', 400)
+    note = p.inner_text('.trip-note')
+    check('transport in New Delhi while the trip is Jaipur: banner says a new trip starts (not "attaches to Stay in Jaipur")', p.locator('[data-trip-other]').count() == 1 and 'Stay in Jaipur' not in note.split('starts')[0][:0] and 'New Delhi' in note and 'attach' not in note.lower(), note)
+    p.locator('.tx-card:not(.is-off) [data-tx-pick]').first.click(); p.wait_for_timeout(300)
+    check('booking New Delhi transport asks before replacing the Jaipur trip', p.locator('.modal-backdrop.show').count() == 1)
+    p.locator('.modal-backdrop.show .modal-foot .btn').first.click(); p.wait_for_timeout(300)
+    check('cancelling keeps the Jaipur trip', pg.ev('() => OT.store.get("journey").scenario') == 'JP')
+    pg.go('transport?city=JP', 400)
+    check('transport in the trip city: banner says bookings attach to "Stay in Jaipur"', p.locator('[data-trip-other]').count() == 0 and 'Stay in Jaipur' in p.inner_text('.trip-note'))
+    p.locator('.tx-card:not(.is-off) [data-tx-pick]').first.click(); p.wait_for_selector('#pay-btn')
+    tid = pg.ev('() => OT.store.get("journey").items.filter(i => /^TR-/.test(i.refId)).map(i => i.refId)[0]')
+    p.reload(); p.wait_for_timeout(500)
+    tx = pg.ev('id => { const x = OT.data.travel.get(id); return x ? { basis: x.basis, policy: !!x.policy, src: !!x.source } : null; }', tid)
+    check('transport leg %s still resolves after reload (basis, policy, source)' % tid, tx and tx['basis'] and tx['policy'] and tx['src'], tx)
+    # "Add a train" keeps the stay
+    pg.go('journey', 400)
+    before = pg.ev('() => OT.store.get("journey").items.filter(i => i.status !== "cancelled").map(i => i.refId)')
+    p.locator('a:has-text("Add a train to this trip"), button:has-text("Add a train to this trip")').first.click()
+    p.wait_for_selector('.trn', timeout=6000)
+    p.locator('.cls-tile:not([disabled])').first.click(); p.wait_for_selector('#pax-form')
+    for i in range(p.locator('.pax-row').count()):
+        if not p.input_value('#px-n%d' % i): p.fill('#px-n%d' % i, 'Test Traveller %d' % i)
+        if not p.input_value('#px-a%d' % i): p.fill('#px-a%d' % i, '30')
+    p.click('#trn-pay'); pg.modal_ok(keep_success=True); p.wait_for_selector('.ps-overlay.show', timeout=8000); p.wait_for_timeout(300)
+    p.click('[data-ps-done]'); p.wait_for_timeout(300)
+    after = pg.ev('() => { const j = OT.store.get("journey"); return { refs: j.items.filter(i => i.status !== "cancelled").map(i => i.refId), train: j.train && j.train.no, to: j.train && j.train.to }; }')
+    check('adding a train keeps the stay and transport already booked', after['train'] and after['to'] == 'JP' and all(r in after['refs'] for r in before), [before, after])
+    pg.scan('journey after add-train ' + vp, 'v12-journey-addtrain-' + vp)
+    pg.go('transport?city=UDZ', 400); pg.go('hotels?city=UDZ', 400)
+    check('a transport search in a new city does not block its hotel listings (Udaipur)', p.locator('#svc-list .offer[data-ref]').count() >= 3)
+    p.reload(); p.wait_for_timeout(500); pg.go('food?city=UDZ', 400)
+    check('after reload, food listings for that city still render', p.locator('#svc-list .offer[data-ref]').count() >= 1)
+    for route in ['food', 'sights']:
+        pg.go(route + '?city=JP', 400)
+        cards = pg.ev(OFFER_JS)
+        if not cards: print('DEBUG food', route, pg.ev('() => [location.hash, document.querySelectorAll(".offer").length, (document.querySelector("#view")||{}).innerText.slice(0,400)]'))
+        check('#/%s (Jaipur): verified, labelled cards with Book now / Add to trip' % route, len(cards) >= 1 and all(c['ok'] for c in cards) and p.locator('[data-book-now]').count() >= 1 and p.locator('[data-add-trip]').count() >= 1, len(cards))
+        n0 = pg.ev('() => (OT.store.get("journey").items || []).length')
+        p.locator('[data-add-trip]').first.click(); p.wait_for_timeout(300)
+        check('#/%s: "Add to trip" adds to the Jaipur trip without leaving the page' % route, pg.ev('() => (OT.store.get("journey").items || []).length') == n0 + 1 and route in pg.ev('() => location.hash'))
+        pg.scan('%s JP %s' % (route, vp), 'v12-%s-%s' % (route, vp))
+    # trains earlier today (or within 30 min) cannot be booked
+    today = pg.ev('() => OT.data.rail.ymd(new Date())')
+    pg.go('trains?from=NDLS&to=BSB&date=' + today, 400)
+    if p.locator('#tf-all').count():
+        p.click('#tf-all'); p.wait_for_timeout(200)
+    bad = pg.ev('''() => { const now = new Date(), m = now.getHours() * 60 + now.getMinutes() + 30;
+        return [...document.querySelectorAll('.trn')].filter(t => { const d = t.querySelector('.trn-times b').innerText.trim().slice(0, 5).split(':'); return (+d[0]) * 60 + (+d[1]) <= m; })
+          .filter(t => [...t.querySelectorAll('.cls-tile')].some(b => !b.disabled)).map(t => t.dataset.train); }''')
+    check('today: trains that have left (or leave within 30 min) are not bookable', not bad, bad)
+    # itinerary: Hindi one page, no real-send claim
+    if vp == 'desktop':
+        pg.ev('() => OT.i18n.setLang("hi")'); pg.go('itinerary-print', 700)
+        pdf = p.pdf(format='A4', print_background=True)
+        n = len(re.findall(rb'/Type\s*/Page[^s]', pdf))
+        check('Hindi one-page itinerary: page.pdf is exactly 1 A4 page', n == 1, n)
+        check('itinerary never claims a real send', not re.search(r'has been sent|sent via WhatsApp Business|delivered to your inbox', p.inner_text('#view'), re.I))
+        pg.ev('() => OT.i18n.setLang("en")')
+    pg.no_errors('v1.2 verify ' + vp)
+    pg.close()
+
+
 # ---------------------------------------------------------------- main
 def free_port():
     s = socket.socket(); s.bind(('127.0.0.1', 0)); port = s.getsockname()[1]; s.close(); return port
@@ -1301,6 +1431,12 @@ def main():
                             v12_flow(browser, base, vp)
                         except Exception:
                             check('v1.2 flow completed', False, ' | '.join(l.strip() for l in traceback.format_exc().splitlines() if 'e2e.py' in l or 'Error' in l)[:900])
+                    GROUP[0] = 'verify v1.2 ' + tag
+                    if want('verify12') or want('verify v1.2'):
+                        try:
+                            v12_verify(browser, base, vp)
+                        except Exception:
+                            check('verify v1.2 completed', False, ' | '.join(l.strip() for l in traceback.format_exc().splitlines() if 'e2e.py' in l or 'Error' in l)[:900])
                         if vp == 'desktop':
                             GROUP[0] = 'v1.2 nav ' + bname
                             try:

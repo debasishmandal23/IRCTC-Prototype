@@ -184,6 +184,8 @@
       compare: []
     };
     T().addItems([x]);
+    // persist the leg so a booked transport item still resolves (basis, policy, source) after a page reload
+    try { OT.store.update('txItems', function (m) { m = m || {}; m[id] = x; var k = Object.keys(m); if (k.length > 120) delete m[k[0]]; return m; }); } catch (e) { /* storage optional */ }
     return T().get(id);
   }
 

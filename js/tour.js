@@ -237,6 +237,12 @@
       curTarget = el || null;
       if (el && el.scrollIntoView && !el.closest('.asst-drawer') && !el.closest('.modal') && !el.closest('.app-header')) {
         try { el.scrollIntoView({ block: el.offsetHeight > window.innerHeight * 0.7 ? 'start' : 'center', behavior: 'auto' }); } catch (e) { el.scrollIntoView(); }
+        // phone: inside the payment pop-up, lift the target above the tour card so the card never hides it
+        var ov = el.closest('.ps-overlay');
+        if (ov && card && window.innerWidth < 700) {
+          var top = card.getBoundingClientRect().top, rr = el.getBoundingClientRect(), need = Math.min(rr.bottom, rr.top + window.innerHeight * 0.5) - (top - 12);
+          if (need > 0) ov.scrollTop += need;
+        }
       }
       setBusy(false);
       place();

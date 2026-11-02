@@ -160,7 +160,8 @@
   }
   function addTrainPath(j) {
     var u = OT.store.get('user') || {}, from = u.homeCity && u.homeCity !== j.scenario ? u.homeCity : (j.scenario === 'NDLS' ? 'CSMT' : 'NDLS');
-    var d = j.start && OT.data.rail.daysTo(D().addDays(j.start, -1)) >= 0 ? D().addDays(j.start, -1) : OT.trains.tomorrow();
+    // arrive the day the stay starts: search the evening before when that is still ahead, else the start day itself
+    var R = OT.data.rail, d = !j.start ? OT.trains.tomorrow() : R.daysTo(D().addDays(j.start, -1)) >= 1 ? D().addDays(j.start, -1) : R.daysTo(j.start) >= 0 ? j.start : OT.trains.tomorrow();
     return OT.trains.path({ from: from, to: j.scenario, date: d, pax: j.passengers });
   }
   /** v1.2: a trip without a train (standalone bookings). */

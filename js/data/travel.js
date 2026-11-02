@@ -397,7 +397,15 @@
     sights: sights,
     policies: policies,
     all: all,
-    get: function (id) { return byId[id]; },
+    get: function (id) {
+      if (byId[id] || !id) return byId[id];
+      // v1.2: after a reload, lazily generated listings are not in memory yet -> rebuild them on demand
+      var m = /^[HCFS]-([A-Z]+)-\d+$/.exec(id);
+      if (m && OT.data.travel.ensureCity) { OT.data.travel.ensureCity(m[1]); if (byId[id]) return byId[id]; }
+      var tx = OT.store && OT.store.get('txItems');           // local-transport legs persisted when they were offered
+      if (tx && tx[id]) { OT.data.travel.addItems([JSON.parse(JSON.stringify(tx[id]))]); return byId[id]; }
+      return undefined;
+    },
     /** Register generated catalogue items (any-city listings, v1.1). */
     addItems: function (items) {
       items.forEach(function (x) {

@@ -320,12 +320,16 @@
   }
   function daysTo(dateStr) { var t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((parseYmd(dateStr) - t) / 86400000); }
   function avail(tr, cls, dateStr) {
-    if (tr.no === '12011' && cls === 'CC') { var k = 12 + hash(dateStr) % 30; return { state: 'AVAILABLE', n: k, label: 'AVAILABLE-' + k }; }
     var r = rng('av:' + tr.no + cls + dateStr)();
     var days = daysTo(dateStr);
     var score = r - pressure(dateStr) * 0.55 - (days >= 0 && days < 5 ? 0.18 : 0) + (cls === '1A' || cls === 'EC' ? 0.18 : 0) - (cls === 'SL' || cls === '3A' ? 0.06 : 0);
     var n = 1 + Math.floor(r * 97) % 60;
     if (days < 0) return { state: 'DEPARTED', n: 0, label: 'DEPARTED' };
+    if (days === 0 && tr.dep) {   // same day: booking closes 30 min before departure (simulated rule)
+      var nw = new Date();
+      if (toMin(tr.dep) <= nw.getHours() * 60 + nw.getMinutes() + 30) return { state: 'DEPARTED', n: 0, label: 'DEPARTED' };
+    }
+    if (tr.no === '12011' && cls === 'CC') { var k = 12 + hash(dateStr) % 30; return { state: 'AVAILABLE', n: k, label: 'AVAILABLE-' + k }; }
     if (score > 0.42) return { state: 'AVAILABLE', n: n, label: 'AVAILABLE-' + n };
     if (score > 0.28) { var rac = 1 + n % 24; return { state: 'RAC', n: rac, label: 'RAC ' + rac }; }
     if (score > 0.02) { var wl = 1 + Math.floor((0.28 - score) * 260) % 120; return { state: 'WL', n: wl, label: 'GNWL ' + wl }; }
@@ -354,7 +358,7 @@
   }
   function train(no, a, b, dateStr) { return search(a, b, dateStr).filter(function (t) { return t.no === no; })[0] || null; }
   function best(a, b, dateStr, prefCls) {
-    var l = search(a, b, dateStr).filter(function (t) { return t.runs; });
+    var l = search(a, b, dateStr).filter(function (t) { return t.runs && t.classes.some(function (c) { return c.avail.state !== 'DEPARTED'; }); });
     if (!l.length) return null;
     var score = function (t) { return (t.no === '12011' ? -1000 : 0) + t.dur - (PREMIUM[t.type] ? 60 : 0) + (prefCls && t.cls.indexOf(prefCls) < 0 ? 300 : 0) + (toMin(t.dep) < 300 ? 200 : 0); };
     return l.sort(function (x, y) { return score(x) - score(y); })[0];

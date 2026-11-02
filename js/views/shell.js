@@ -174,6 +174,22 @@
 
     var mb = $('nav-more-btn');
     if (mb) mb.addEventListener('click', function (e) { e.stopPropagation(); setMore(!moreOpen); });
+    // keyboard: ArrowDown/Up on the button opens the menu and focuses an item; arrows move inside; Tab out closes
+    var moreBox = $('nav-more');
+    if (mb && moreBox) moreBox.addEventListener('keydown', function (e) {
+      var items = OT.$$('#nav-more-menu a, #nav-more-menu button').filter(function (x) { return x.offsetWidth || x.offsetHeight; });
+      var i = items.indexOf(document.activeElement);
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!moreOpen) setMore(true);
+        items = OT.$$('#nav-more-menu a, #nav-more-menu button').filter(function (x) { return x.offsetWidth || x.offsetHeight; });
+        if (!items.length) return;
+        var n = i < 0 ? (e.key === 'ArrowDown' ? 0 : items.length - 1) : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        items[n].focus();
+      } else if (e.key === 'Tab' && moreOpen) {
+        setTimeout(function () { if (!moreBox.contains(document.activeElement)) closeMenu(); }, 0);
+      }
+    });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && moreOpen) { closeMenu(); if (mb) mb.focus(); } });
     document.addEventListener('click', function (e) {
       if (!e.target.isConnected) return;

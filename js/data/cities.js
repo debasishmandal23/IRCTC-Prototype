@@ -60,7 +60,8 @@
   function cmp(p, a, b) { return [{ name: 'TravelSite A (sample)', price: r50(p * a) }, { name: 'TravelSite B (sample)', price: r50(p * b) }]; }
 
   function ensureCity(code) {
-    if (!code || made[code] || T.byCity(code).length) { made[code] = true; return T.byCity(code); }
+    // skip only when real listings exist: local-transport legs (x.leg) for the city must not block generating its hotels/food/sights
+    if (!code || made[code] || T.byCity(code).some(function (x) { return !x.leg; })) { if (code) made[code] = true; return T.byCity(code); }
     made[code] = true;
     var st = T.stations[code]; if (!st) return [];
     var city = st.city || st.names.en, cityHi = st.names.hi || city;

@@ -1,4 +1,83 @@
-# IRCTC OneTrip: Verification report (v1.1)
+# IRCTC OneTrip: Verification report (v1.2)
+
+Independent verification of v1.2 against the owner's six v1.2 requests, in the owner's own words, plus regressions of v1 and v1.1. Verified on 2 Nov 2026 by a separate agent that did not build v1.2. The v1.1 and v1 reports follow below as history.
+
+**Result (v1.2):** after the 10 app fixes in section v1.2-3, `python3 tests/e2e.py --base file` passes **1601 checks with 0 failures**, and `--base http` passes **1970 checks with 0 failures**. Both cover 1440×900 and 375×812, with 0 console errors and 0 page errors. The new screens were screenshotted at 1440 and 375 and reviewed by eye (pop-up, hotels, transport, food, sights, journey without a train, add-a-train, itinerary print in en/hi, nav in en/hi/ta/ml, tour steps 9 and 18 on a phone).
+
+## v1.2-1. Traceability: the owner's six v1.2 requests
+
+| ID | The owner asked for | Where in the UI | Status | Evidence (tests + screenshots) |
+|---|---|---|---|---|
+| V1 | "book hotels or cabs or any other services individually … from a particular place to particular place", without a train | Home widget tabs (Trains · Hotels · Local transport · Food · Sightseeing · Packages); `#/hotels`, `#/transport`, `#/food`, `#/sights`; standalone checkout → Bookings & refunds → cancel; My Journey "Stay in {city}" with **Add a train to this trip** | Pass (after fixes #2–#5, #9, #10) | Hotel, transport, food and sight booked or added with no train. The standalone hotel and transport legs are cancellable in Bookings. **Adding a train keeps the stay and transport** (checked by refIds). After a reload, the paid amount still equals My Journey's cost. Another city's page says a new trip will start, and **asks before replacing** the current trip. |
+| V2 | "plan trip, trains, my journey, booking and refunds all should come on the top, not as a list" | Horizontal tab bar under the header; "Partners & admin" menu on desktop, inline links on phones | Pass (after fixes #6, #7) | No hamburger at 320, 375, 414, 600, 768, 1024, 1280, 1366, 1440 or 1920. **The four requested tabs are fully on screen at every width, in all 11 languages** (probed). There is no page overflow. The menu opens and closes by mouse, Enter, **ArrowDown/Up**, Escape (focus returns) and Tab-out. |
+| V3 | A Google-Pay-like "payment confirmed" pop-up | `.ps-overlay` after train, standalone and journey checkouts | Pass (after fix #8) | The builder's washed-out screenshot was a **mid-fade capture**. The settled state (after 1.5 s) has overlay and card opacity 1 and a white card. Done, View itinerary, Share, PDF, WhatsApp and Email are reachable at 375. Reduced motion means no confetti and no transform. Mute persists after a reload. On a phone, the tour card no longer covers the pop-up (steps 9 and 18). |
+| V4 | Buses and metros with side-by-side cab/metro/bus prices | `#/transport` and the journey Transport tab | Pass (after fix #2) | Cab, auto, metro, bus, e-rickshaw and walk are shown side by side with total and per-person prices, time, frequency, comfort, luggage, door-to-door and CO₂. The Cheapest, Fastest and Best-for-your-group badges are correct (the auto at 7+4 min beats the cab at 7+6). "No metro in Chandigarh" is stated honestly. Booking a mode works, and the leg can be cancelled. The phone layout is two columns: dense but legible. |
+| V5 | A budget range clearly visible and settable (₹3,000/₹5,000) | Budget control on `#/hotels`, results and the ticket "plan the stay" step | Pass | The slider, min/max inputs and chips stay in sync. "x of y hotels within budget" is shown, and every hotel shown is within the range. Typed **and** voiced (fake recogniser) "hotel in Jaipur under 3000" both show **"Up to ₹3,000"**, set max = 3000, give "4 of 6 within budget", and every price is ≤ 3000. |
+| V6 | A one-page itinerary snapshot/PDF to WhatsApp and email after payment | Pop-up "Your one-page itinerary"; My Journey card; `#/itinerary-print` | Pass | `page.pdf` is **exactly 1 A4 page** for a long journey (train + meal + hotel + cab + 2 sights + cloakroom + return, 13 rows), in **English and Hindi**. The PNG is drawn on a canvas. WhatsApp uses `https://wa.me/91XXXXXXXXXX?text=` (URL-encoded) after consent and a confirm step. Email uses `mailto:` with subject and body. The admin notifications log masks recipients ("+91 98XXX XX210", "su…@…"). Nothing claims a real send: every result says "(simulated)" and notes that a production system would use the WhatsApp Business API. |
+| REG | v1.1 flows, the 22-step tour, no console errors, no secrets | | Pass | The full suites listed below re-ran: persona sign-in, For you, the "book from Chandigarh to Mumbai train" voice and typed paths, train-first booking, refunds, partner "New via OneTrip", admin totals, and the tour at both widths plus Exit mid-way. The secrets grep found only the fake test key. |
+
+## v1.2-2. Test changes
+
+- New **`v12_verify`** group (independent; run with `--only verify12`), at both widths:
+  - login persona cards free of the payment-card styles
+  - phone nav: four required tabs on screen in en/hi/ta/ml
+  - "Partners & admin" keyboard support
+  - payment pop-up in its settled state, with all buttons reachable
+  - mute after reload
+  - Jaipur stay cost after reload = amount paid
+  - transport leg resolves after reload
+  - other-city banner and "ask before replacing"
+  - "Add a train" keeps the items
+  - a transport search in a new city doesn't block its listings
+  - `#/food` and `#/sights` book and add standalone
+  - trains that already left today are not bookable
+  - Hindi itinerary is one A4 page with no real-send claim
+- **Tour** group: on a phone, while the payment pop-up is open, the highlighted part must sit above the tour card.
+- `modal_ok(keep_success=True)` keeps the pop-up open when a test inspects it (the builder's helper closes it by default).
+
+## v1.2-3. Bugs found and fixed in v1.2
+
+| # | File(s) | Fix |
+|---|---|---|
+| 1 | `js/views/auth.js`, `css/traveller.css` | **Class collision `.ps-card`:** the v1.1 login persona cards and the new payment card shared the class. The login cards picked up the pop-up's centring and `translateY(14px) scale(.98)`, and the pop-up picked up the persona flex/border styles. The login class is now `.login-persona`. |
+| 2 | `js/views/services.js`, `js/core/i18n.js` | **Wrong banner:** `#/transport` (and hotels, food, sights) for New Delhi said "Bookings here attach to your trip 'Stay in Jaipur'". The banner now follows the searched city: "Your current trip is to Jaipur. Booking in New Delhi starts a new trip 'Stay in New Delhi'; we ask before replacing anything…" (en + hi). Booking behaviour was already correct: it asks first. |
+| 3 | `js/data/travel.js` | **After a reload, generated-city listings vanished:** a paid ₹6,400 two-night Jaipur stay showed **₹3,200** in My Journey (price × 1 night), with its policy and source gone. `travel.get()` now rebuilds the city on demand from the id. |
+| 4 | `js/data/transport.js`, `js/core/store.js` | Booked local-transport legs (`TR-…`) could not be resolved after a reload (basis, policy and source were lost). Each offered leg is now persisted (`txItems`, capped at 120) and restored by `get()`. |
+| 5 | `js/data/cities.js` | **"No verified options" on Food/Hotels:** `ensureCity` skipped generating a city's listings if any item existed, including a transport leg. After a transport search, or the restored leg in #4, Jaipur food showed nothing. Transport legs are now ignored by that guard. |
+| 6 | `js/views/shell.js` | **"Partners & admin" keyboard:** ArrowDown scrolled the page and closed the menu, so items were unreachable by keyboard. ArrowDown/Up now open and move through the items, and Tab-out closes the menu. |
+| 7 | `css/traveller.css` | **Phone nav hid the requested tabs:** at 375 px "Bookings & refunds" was off-screen (en), and in ta/ml "My Journey" was too. The inline partner links (`display: contents`) jumped to the front of the row. Malayalam/Telugu labels were clipped. On ≤ 640 px the four requested tabs now come first, each capped at 23 vw with two-line labels (no mid-word breaks), so they fit at 320 px in all 11 languages. Hotels, Transport and Partners follow in the scroll row. |
+| 8 | `js/tour.js`, `css/traveller.css` | **The tour card covered the payment pop-up on a phone** (Done, Share and the itinerary buttons at steps 9 and 18). While the pop-up is open, the tour card is compact (2-line notes), the overlay gets scroll room, and the tour lifts the highlighted part above the card. |
+| 9 | `js/data/rail.js` | **Trains that had already left today were bookable:** a 04:15 train was booked at 21:40, and 12011 was always "AVAILABLE". Same-day trains now become DEPARTED 30 minutes before departure (the 12011 shortcut comes after this rule), and planned journeys never pick a departed train. |
+| 10 | `js/views/journey.js` | **"Add a train to this trip" late in the evening offered only departed trains,** because it searched today. It now searches the evening before the stay only when that is still ahead, otherwise the stay's start day. |
+| 11 | `tests/e2e.py` | `v12_verify` group and the tour phone check (see v1.2-2). The builder's pop-up screenshot now waits for the settled state, so review shots are no longer mid-fade; the v1.2 group was re-run after that change: 148/148 on file and on http. |
+
+## v1.2-4. Remaining known limitations (most severe first)
+
+1. **Medium: WhatsApp and email are hand-offs** (wa.me / mailto). No server send; this is labelled "(simulated)" everywhere and explained in the dialogs. A production system would need the WhatsApp Business API and a mail service.
+2. **Medium: voice needs Chrome/Edge, mic permission and an OS voice for read-aloud** (unchanged from v1.1). The mic path is verified with a fake recogniser.
+3. **Low: transport comparison on a 375 px phone uses two narrow columns,** so some facts wrap ("5 min +4 / wait"). Legible, and intentional to keep the side-by-side view.
+4. **Low: the payment pop-up's chime is WebAudio and fails silently** where audio is blocked. Mute is remembered per browser.
+5. **Low: the phone tab bar scrolls sideways for Hotels, Transport and Partners & admin.** The four requested tabs are always visible.
+6. **Low: local fares, frequencies, CO₂ and train timetables are deterministic simulations** (labelled).
+7. **Low: the success sound, confetti and PNG rendering depend on the browser.** With reduced motion there is no confetti or animation.
+8. The live Gemini path is still untested (no key); the offline fallback is verified.
+
+## Jury demo checklist
+
+1. Use **Chrome or Edge** on a laptop (window ≥ 1280 px). Open `index.html` by double-click, or run `start-server.bat` / `.sh` (a local server remembers mic permission).
+2. Before the jury arrives: **Settings → Reset demo data**, then check the top bar shows Plan trip · Trains · Hotels · Transport · My Journey · Bookings & refunds.
+3. Set **AI mode to "Simulated only"** unless the Wi-Fi and the Gemini key were tested that morning.
+4. Windows: install the Hindi voice (**Settings → Time & Language → Speech → Add voices → Hindi**) and reopen the browser. Check **Settings → Voice capability check**.
+5. Unmute the success sound (speaker icon on the pop-up) if you want the chime. It stays as you leave it.
+6. **Allow the microphone**. Rehearse "book from Chandigarh to Mumbai train" and "hotel in Jaipur under 3000": the budget should show "Up to ₹3,000".
+7. Scripted run: **Start demo** and only *Next* (22 steps). **×** or Esc exits at any point. On a phone, scroll the payment pop-up if needed; the tour card stays compact.
+8. Standalone story: **Hotels → Jaipur → Book now → pay** → pop-up → **Your one-page itinerary → Download PDF / WhatsApp** (consent + confirm) → My Journey "Stay in Jaipur" → **Add a train to this trip** (the stay is kept).
+9. Local transport story: **Transport → Chandigarh**. Cab, auto, bus, e-rickshaw and walk compared, "No metro in Chandigarh", then book the bus. Partner and admin are under **Partners & admin**.
+10. Close other tabs, set zoom to 100% (Ctrl+0), and turn off notifications. Trains, fares, hotels, transport and sends are **simulated**; say so if asked.
+
+---
+
+# v1.1 report (history, 2 Nov 2026)
 
 Independent verification of the static prototype against the project brief, the requirements traceability (`docs/research/01_requirements.md`), the survey statistics (`docs/research/survey_stats.json`), the build contract (`docs/ARCHITECTURE.md`) and the owner's four v1.1 requests. Verified on 2 Nov 2026 by a separate agent that did not build the app. The v1 report follows below as history (section "v1 report").
 
@@ -131,7 +210,7 @@ Security (v1.1): grep of the repository and git history for `AIza…`, `AQ.Ab8`,
 8. Low: on phones ≤ 400 px wide the header globe icon is hidden (the language select is still labelled), and long localised "Sign in" labels are ellipsised.
 9. The Gemini live path was tested only offline (graceful fallback); no real key was available.
 
-## Jury demo checklist
+### v1.1 jury demo checklist (superseded by the one above)
 
 1. Use **Chrome or Edge** on a laptop (window ≥ 1280 px). Open `index.html` by double-click, or run `start-server.bat` / `start-server.sh` (a local server remembers mic permission).
 2. Before the jury arrives, open **Settings → Reset demo data**. Then open **Sign in** (header) and check that the six persona cards render side by side.
