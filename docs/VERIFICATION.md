@@ -1,10 +1,158 @@
-# IRCTC OneTrip: Verification report (v1)
+# IRCTC OneTrip: Verification report (v1.1)
+
+Independent verification of the static prototype against the project brief, the requirements traceability (`docs/research/01_requirements.md`), the survey statistics (`docs/research/survey_stats.json`), the build contract (`docs/ARCHITECTURE.md`) and the owner's four v1.1 requests. Verified on 2 Nov 2026 by a separate agent that did not build the app. The v1 report follows below as history (section "v1 report").
+
+**Result (v1.1):** after the 21 fixes listed in section v1.1-4, the automated suite passes **2389 of 2389 checks, with 0 failures**. It covers file:// and http, at 1440×900 and 375×812, with 0 console errors and 0 page errors. (The last full run, after the final app fix, gave 2377/2377. The verifier group was then re-run on both bases after a test-only change that pins the package to Chandigarh, so the partner "New via OneTrip" and admin checks always run: 584/584. The total combines the two.) Every new screen was also screenshotted at both widths in English, Hindi and Tamil and reviewed by eye.
+
+## v1.1-1. What changed in the test suite
+
+`tests/e2e.py` now has three v1.1 layers:
+- **Builder suite** (`v11_flow`): trains, voice commands, personas, For you, package → PNR → journey, train cancel, any-city results.
+- **Verifier suite** (`v11_verify`, independent): see the matrix below.
+- **v1 suites, re-run unchanged** (journey, checkout, refunds, assistant, partner, admin, settings, 11-language route sweep, the guided tour at both widths including Exit mid-way, and edge cases).
+
+New options: `--only verify,tour` runs selected groups, and `--base file|http` runs one entry point. The test helper `go()` now forces a re-render when the hash does not change, as a presenter's click would.
+
+## v1.1-2. Test matrix and results
+
+| Suite (×4 = file/http × desktop/mobile) | Checks | Fail |
+|---|---|---|
+| Assets (local refs, no modules/fetch) | 2 | 0 |
+| Traveller journey (v1 9 steps + cancel/refund + assistant) | 136 | 0 |
+| Partner (CRUD, calendar, enquiries, New via OneTrip) | 82 | 0 |
+| Admin (9 tabs, live totals) | 110 | 0 |
+| Route sweep (11 languages; en+hi on file-mobile) | 783 | 0 |
+| Settings (key test offline, modes, reset) | 38 | 0 |
+| Guided demo, 20 steps + Exit mid-way | 278 | 0 |
+| Edge cases (empty, reload, 404, rapid language switch, no SR, no localStorage) | 86 | 0 |
+| Builder v1.1 suite (trains, voice, personas, For you) | 290 | 0 |
+| Verifier v1.1 suite (independent; see list below) | 584 | 0 |
+| **Total** | **2389** | **0** |
+
+The verifier suite (`v11_verify`) covers, at both widths:
+- **Header:** the globe icon is ≥ 14 px; "Sign in" text is shown; the desktop nav stays visible both signed out and signed in; header icon buttons are never squeezed.
+- **Request 2, every phrase, all three paths:** typing + Enter, the → button, and the **real mic code path** with a fake `SpeechRecognition`.
+  - "book from Chandigarh to Mumbai train" → CDG→CSMT, tomorrow
+  - "चंडीगढ़ से मुंबई ट्रेन" → CDG→CSMT
+  - "Chandigarh to Mumbai on Friday" → the next Friday, and the date bar shows "Fri"
+  - "train from Delhi to Varanasi tomorrow" → NDLS→BSB, tomorrow
+  - "hotel in Jaipur under 2000" → Jaipur results with budget ₹2,000, and every hotel shown is ≤ ₹2,000
+  - gibberish → stays on home with guidance
+  - "train from Delhi" (no destination) → asks "where to?"
+  - Each must show a visible "I heard …" within 4 s.
+- **Request 1, search:** the same search gives the same trains; past dates are rejected in both forms; the previous-day button never goes before today.
+- **Timetable integrity**, over 232 train-dates on 12 routes × 4 dates:
+  - arrival = departure + duration, and arrOffset is dated
+  - average speed 25–110 km/h
+  - fares by class 1A > 2A > 3A > 3E > SL, and EC > CC
+  - fare breakup adds up exactly to the total
+  - fare/km within sane bands for trips ≥ 300 km
+  - 3A fares grow with distance
+  - no DEPARTED status on future dates
+  - deterministic results; every station code is a real IR code
+  - overnight arrivals carry the next date
+- **Request 3, personas:**
+  - `#/login` layout: 6 cards, each ≥ 220 px wide, no text overflowing a card, no overlapping "Sign in as" buttons
+  - persona sign-in sets language, home city, party and trip history (shown in Bookings)
+  - header menu: switch persona and sign out
+  - the home city fills a missing "from"
+  - Neha's default consent is off, so she gets no suggestions
+- **Request 4, For you:**
+  - long-weekend dates and weekdays computed independently and compared, for today's date
+  - no past travel dates
+  - trending routes from the home city
+  - package total = sum of its lines; savings = separate − total
+  - the package train runs on its date
+  - **hotel nights cover arrival → return**
+  - "Why am I seeing this?"; the consent toggle hides suggestions, and that persists after reload
+- **"Book this package", end to end:** package train → passengers → fare lines add up → confirm → PNR → arrival date checked → plan stay → the package hotel, cab and sight are in the journey → **nothing is scheduled before the train arrives** → the checkout services total equals the package lines → pay → the partner sees the hotel (not the train) as "New via OneTrip" → admin add-on GTV excludes train fares → the admin forecast names the same weekend.
+- **Train cancel:** the refund equals an independent railway-rule calculation; the dialog shows the amount; the journey shows CANCELLED, readiness "Cancelled" with ticket 0/30, and a warning that the hotel and cab are still active.
+- **Any-city results:** Mumbai and Varanasi hotels and cabs, each verified, labelled and sourced.
+- **Languages:** en, hi and ta on home, trains, train booking, login, bookings and journey.
+
+## v1.1-3. Traceability: the owner's four v1.1 requests
+
+| ID | Requirement | Where in the UI | Status | Evidence |
+|---|---|---|---|---|
+| R1.1 | Enter from/to/date | Home "Step 1 · Find trains" (station typeahead in any script, date, class, travellers); `#/trains` form | Pass | typeahead finds Mumbai from "मुं" and Chennai from "சென்"; past dates blocked |
+| R1.2 | Different trains for that date | `#/trains?from&to&date`: running days, "does not run on", time slots, sort, "available only", previous/next day | Pass | determinism + integrity checks (232 train-dates) |
+| R1.3 | Book the train → PNR | `#/trains/book` (passengers prefilled from the persona, itemised fare, human-in-the-loop confirm) → `#/trains/ticket` (10-digit PNR, CNF berth or RAC/WL with chance) | Pass | "nothing booked before confirm"; PNR regex; fare lines add up |
+| R1.4 | Then hotels/cabs/food/sights for the destination | e-ticket "Now plan your stay & travel in {city}" → `#/results?to=` (any of 39 stations) | Pass | Mumbai, Varanasi, Hyderabad, Jaipur, Goa and Guwahati results verified |
+| R2.1 | "book from Chandigarh to Mumbai train" responds visibly and shows trains | home ask box: "I heard …" + chips (intent / from / to / date), then train results with an "I heard" banner | Pass | Enter, button and mic paths all tested |
+| R2.2 | Hindi, weekday, "tomorrow", hotel-with-budget, gibberish, missing destination | same | Pass | 7 phrases × 3 paths (the mic path is skipped for the two "stay on home" inputs except gibberish) |
+| R3.1 | Persona cards on `#/login` (4 travellers + partner + admin) | `#/login` "Choose a demo persona" | Pass (after fix #1) | layout assertions at 1440 and 375 |
+| R3.2 | Header "Sign in" text + user menu (switch persona / sign out) | header `#hdr-user` → `#user-menu` | Pass (after fixes #2–#4) | |
+| R3.3 | Persona sets language, home city, history | persona sign-in; "Keep {language}" offer; Bookings "Past trips" | Pass | Sunita → hi / NDLS / 3 travellers / 3 past trips |
+| R4.1 | Long-weekend detector with correct dates | home + My Journey "For you" tabs; admin forecast | Pass | 24 Nov 2026 Tue → Sat 21–Tue 24 (leave Mon 23); 25 Dec 2026 Fri → 25–27; 26 Jan 2027 Tue → Sat 23–Tue 26; no past weekends (the travel date must be ≥ today, fix #12) |
+| R4.2 | Trending routes from the home city | "For you": N travellers from {home city}, +x% vs a normal weekend, fills N days early | Pass | aggregated and anonymised; labelled simulated |
+| R4.3 | Packages with total and savings | package card | Pass (after fix #10) | total = sum of lines; savings = separate − total; nights cover arrival → return |
+| R4.4 | "Book this package" does the whole chain | package → trains → book → PNR → plan stay → journey → pay | Pass (after fixes #11, #13) | nothing planned before the train arrives; checkout total = package |
+| R4.5 | "Why am I seeing this?" + consent toggle hides the section | "For you" | Pass | consent persists after reload |
+| R4.6 | Admin long-weekend forecast | `#/admin/demand` | Pass | same next weekend as the traveller view |
+| REG | v1 regressions (journey, checkout, refunds, assistant, partner "New via OneTrip", admin totals, 20-step tour) | | Pass (after fix #9) | v1 suites re-run, the tour run fully at both widths, and Exit mid-way |
+
+## v1.1-4. Bugs found and fixed in v1.1
+
+| # | File | Fix |
+|---|---|---|
+| 1 | `js/views/auth.js`, `css/traveller.css` | **Persona cards crushed into ~85 px columns at 1440.** The login section reused the class `.personas`, which `dashboards.css` (loaded later) defines as the Business-case 4-column grid. Renamed to `.login-personas` / `.ps-card`. |
+| 2 | `css/base.css` | **The header globe shrank to a ~6 px dot.** The flex item was squeezed; it is now pinned at 16×16. |
+| 3 | `css/traveller.css` | **At 1440 the main nav collapsed into the hamburger** (the new "Trains" link plus the "Sign in" button made the header overflow). Tight mode now trims spacing first, and drops only the signed-in first name (initials stay), so the nav stays visible with the "Sign in" text. |
+| 4 | `css/traveller.css` | The mobile hamburger was squeezed to 24 px. Header icon buttons no longer shrink. |
+| 5 | `js/views/auth.js` | The persona card showed "Mumbai CSMT CSMT". The code is now appended only when the name lacks it. |
+| 6 | `js/data/rail.js` | **2A cheaper than 3A** on trains with one fixed sample fare (e.g. 12837: 2A ₹1,125 < 3A ₹1,240). Other classes now scale by the same ratio. |
+| 7 | `js/data/rail.js` | **The fare summary did not add up** (e.g. lines ₹3,076 vs total ₹3,080, from ₹5 rounding). GST (or the base fare on non-AC trains) absorbs the rounding. |
+| 8 | `js/views/home.js`, `js/views/trains.js`, `js/core/i18n.js` | Past travel dates could be searched (every class then showed "Departed"). Both forms now set `min` = today and reject past dates with a message (en + hi). |
+| 9 | `js/data/analytics.js`, `js/views/admin.js` | **Admin "add-on GTV" counted IRCTC train fares.** Trains are now excluded from add-on GTV and orders, and shown separately ("{n} train ticket(s) ₹X counted as IRCTC ticketing"). |
+| 10 | `js/data/personas.js` | **Package hotel nights did not cover the trip** (e.g. travel 20 Nov → return 24 Nov priced as 2 nights). Nights are now computed from the train's arrival date to the last day of the long weekend. |
+| 11 | `js/agents/agents.js` | **Late trains created impossible itineraries:** a Jaipur train arriving at 23:55 had Amber Fort at 09:00 and check-in at 12:00 the same day ("planned before your train arrives" ×2). Check-in now moves to arrival + 45 min when the train lands after the hotel's check-in time, and sights/meals move to the next day when they would start before arrival + 1 h. |
+| 12 | `js/data/personas.js` | (Guard) A long weekend whose travel date has already passed is skipped. |
+| 13 | `js/views/trains.js`, `js/views/foryou.js`, `js/tour.js` | Booking a package train on a different date than suggested kept the package's night count, so the stay ran past the weekend. Nights are now derived from the package's return date and the actual arrival. |
+| 14 | `js/agents/agents.js`, `js/views/journey.js`, `js/core/i18n.js` | After a train cancel, readiness said "Train ticket: Missing". It now says **Cancelled**, and My Journey warns that the hotel, cab and sights are still booked, with a link to Bookings. |
+| 15 | `js/views/journey.js` | Trip cost still read "Train ticket (paid on IRCTC)" after a cancel. It now shows the struck-through fare with "cancelled, refund as per railway rules". |
+| 16 | `js/views/foryou.js` | The Hindi "For you" line mixed in an English weekday ("… Tue को है"). The weekday is now localised. |
+| 17 | `js/views/admin.js` | The admin forecast showed raw "11-21…11-24". It now shows "21 Nov – 24 Nov". |
+| 18 | `tests/e2e.py` | Verifier suite added (layout, phrases × 3 input paths, data integrity, package chain, refunds, admin), plus `--only` / `--base` and a re-render-safe `go()`. |
+| 19 | `tests/e2e.py` | Test races fixed: reading `#voice-status` during navigation, and a stale typeahead dropdown after a same-hash `go()`. |
+| 20 | `css/traveller.css` | **Horizontal scroll on phones in 6 languages** (ta, te, ml, gu, pa, or): the localised "Sign in" label pushed the 375 px header to 380–406 px. When signed in, the name was also shown on phones. On phones, the signed-out label is now capped and ellipsised, the signed-in name is hidden (initials only), and at ≤ 400 px the globe icon is hidden so the language name (e.g. "English") stays readable. Probed in all 11 languages, signed in and out: header width = 375 px. |
+| 21 | `js/views/partner.js` | The partner's live hotel row said "1 night(s)" for a 3-night ₹7,950 package stay. Nights are now computed from the stay's check-in and check-out dates. |
+
+Security (v1.1): grep of the repository and git history for `AIza…`, `AQ.Ab8`, `key=…`, `sk-…` and `api_key` literals found only the deliberately fake test value `AIzaFAKE-test-key-not-real` in `tests/e2e.py`. **There are no secrets.** The new user/AI text (the heard query, passenger names, persona fields) is escaped (`OT.esc` / `OT.lang.highlight`).
+
+## v1.1-5. Remaining known limitations (most severe first)
+
+1. **Medium: voice depends on the device.** ASR needs Chrome or Edge plus mic permission, and read-aloud needs an OS voice for the language. Without them the app explains and offers sample voice chips. The mic path is verified with a fake recogniser, not a real microphone.
+2. **Medium: partner listing and calendar edits do not change traveller results.** The traveller side uses the fixed, simulated catalogue; the partner pages say so.
+3. **Low: the For-you tabs scroll sideways on narrow screens.** The third weekend's label is cut at the edge until scrolled (desktop shows about 2.5 tabs).
+4. **Low: the train refund is simplified railway logic.** Charges are flat per class above 48 h, 25 % within 12–48 h and 50 % within 4–12 h, with no refund within 4 h (chart prepared). WL/RAC carry a ₹60 clerkage. GST on cancellation is ignored, and the convenience fee is non-refundable. All of it is labelled simulated.
+5. **Low: the holiday calendar is a sample.** Movable festivals (Holi, Good Friday, Guru Nanak Jayanti 2027) carry "sample date" or "verify with the official gazette" notes.
+6. **Low: language coverage.** English and Hindi are complete. Tamil and the other 8 languages translate the header, search, statuses, assistant and the main new labels, and fall back to English elsewhere (as explained on About).
+7. **Low: on a 375 px phone the guided tour's card covers the lower screen.** The tour still completes all 20 steps; a laptop is the better demo device.
+8. Low: on phones ≤ 400 px wide the header globe icon is hidden (the language select is still labelled), and long localised "Sign in" labels are ellipsised.
+9. The Gemini live path was tested only offline (graceful fallback); no real key was available.
+
+## Jury demo checklist
+
+1. Use **Chrome or Edge** on a laptop (window ≥ 1280 px). Open `index.html` by double-click, or run `start-server.bat` / `start-server.sh` (a local server remembers mic permission).
+2. Before the jury arrives, open **Settings → Reset demo data**. Then open **Sign in** (header) and check that the six persona cards render side by side.
+3. Set **AI mode to "Simulated only"** unless the venue Wi-Fi and the Gemini key were tested that morning (Settings → *Test key*).
+4. Windows: install the Hindi voice under **Settings → Time & Language → Speech → Add voices → Hindi** (and Tamil if you demo Ramesh), then reopen the browser. macOS: System Settings → Accessibility → Spoken Content → Manage Voices.
+5. Check **Settings → Voice capability check**: Hindi shows "voice(s)" and speech recognition shows "supported". Press *Play a Hindi sample* through the room's speakers.
+6. **Allow the microphone** on the first prompt. Rehearse once: say "book from Chandigarh to Mumbai train" on the home page. You should see "I heard …" and then the train list. If the mic fails, type it and press Enter, or use the **English · train** / **हिन्दी** sample chips.
+7. For the scripted run, press **Start demo** and then only *Next* (20 steps). **×** or Esc exits at any point. It signs in as Sunita (Hindi) and books the 12011 Shatabdi, then the stay.
+8. For the live "For you" moment, sign in as **Sunita** from the header menu. The Christmas weekend (Fri 25 Dec) and Guru Nanak Jayanti (Tue 24 Nov) appear. Show "Why am I seeing this?" and the consent switch, then **Book this package**.
+9. For the "wow" moment after paying, use the header menu to switch to **Rajinder (partner)**: the hotel booking is highlighted "New via OneTrip". Then switch to **Ananya (admin) → Destination demand** for the long-weekend forecast.
+10. Close other tabs, turn off notifications and screen savers, set browser zoom to 100% (Ctrl+0), and keep this checklist on a second screen. Train timetables, fares and holiday dates are **simulated samples**; say so if asked.
+
+---
+
+# v1 report (history, 1 Nov 2026)
 
 Independent verification of the static prototype against the project brief, the requirements traceability (`docs/research/01_requirements.md`), the survey statistics (`docs/research/survey_stats.json`) and the build contract (`docs/ARCHITECTURE.md`). Verified on 1 Nov 2026 by a separate agent that did not build the app.
 
 **Result:** after the fixes listed below, the automated suite passes **1354 of 1354 checks, with 0 failures**. It covers file:// and http, at 1440×900 and 375×812. We found 0 console errors and 0 page errors.
 
-## 1. Test environment
+### v1 · 1. Test environment (unchanged for v1.1)
 
 | Item | Value |
 |---|---|
@@ -15,7 +163,7 @@ Independent verification of the static prototype against the project brief, the 
 | Voice | Headless Chromium has no TTS voices. Speech recognition is tested both as "present but failing" and as "absent", via an init script. |
 | Test script | `tests/e2e.py`. Run it from the repo root with `python3 tests/e2e.py` (add `--quick` to test only en+hi on most matrices, or `--shots DIR` to save screenshots). The run writes `tests/last-run.json`, which git ignores. |
 
-## 2. Test matrix and results
+### v1 · 2. Test matrix and results
 
 The matrix is {file, http} × {desktop, mobile}. The full language sweep runs on every combination except file-mobile, which runs en + hi.
 
@@ -33,11 +181,11 @@ The matrix is {file, http} × {desktop, mobile}. The full language sweep runs on
 
 Visual QA: each route was screenshotted at both widths, in en and hi, plus every tour step. The screenshots were reviewed by eye. The defects found are fixed below. Traveller and dashboard styling is consistent: both use navy/blue on white with saffron accents and the same cards, badges and buttons. No CSS class collision between `traveller.css` and `dashboards.css` was found. The traveller side uses `.ot-eyebrow`, `.board-*` and `.bkg/.bk-*`, while the dashboards use `.eyebrow`, `.board` and `.bk`. One collision inside `traveller.css` was found and fixed (#5 in section 4).
 
-## 3. Traceability matrix
+### v1 · 3. Traceability matrix
 
 Status: **Pass** = present and tested; **Partial** = present with a stated limitation. No requirement is Fail.
 
-### Brief: interfaces (§2)
+#### Brief: interfaces (§2)
 
 | ID | Requirement | Where in the UI | Status | Evidence |
 |---|---|---|---|---|
@@ -53,7 +201,7 @@ Status: **Pass** = present and tested; **Partial** = present with a stated limit
 | P-1…P-7 | Partner register/login, listings, price & availability, enquiries, confirmed bookings, revenue/conversion/cancellations, feedback | `#/partner/{overview,listings,pricing,enquiries,bookings,performance,feedback}` | Pass (P-3 Partial) | partner suite. P-3: calendar/listing edits stay in the partner view; traveller results use the fixed sample catalogue (stated on screen) |
 | A-1…A-6 | Users and providers, bookings and GTV, complaints/refunds/partner performance, destination demand, financial products, language usage/translation quality/support | `#/admin/{users,bookings,complaints,partners,demand,finance,language}` (+ overview, platform) | Pass | admin suite. Live booking included in totals |
 
-### Brief: agents (§3), BHASHINI (§4), data rules (§7)
+#### Brief: agents (§3), BHASHINI (§4), data rules (§7)
 
 | ID | Requirement | Where | Status | Evidence |
 |---|---|---|---|---|
@@ -82,7 +230,7 @@ Status: **Pass** = present and tested; **Partial** = present with a stated limit
 | SG-5 | Uncertain translation → original or human | low confidence → "Low confidence: original shown; a human can help." and escalation chip | Pass | |
 | SG-6 | Explain unavailable language/voice | "Voice input is not supported…", "No Hindi voice is installed…", partial-coverage note | Pass | no-SR test |
 
-### Brief: UI/UX (§5), features (§6), prototype (§8), deliverables (§9)
+#### Brief: UI/UX (§5), features (§6), prototype (§8), deliverables (§9)
 
 | ID | Requirement | Where | Status |
 |---|---|---|---|
@@ -98,7 +246,7 @@ Status: **Pass** = present and tested; **Partial** = present with a stated limit
 | PR-3 | Simulated payments; no real payment data; label simulated data; no live-integration claim | global banner "No live IRCTC, BHASHINI or bank integration", SIMULATED tags on every price, masked demo payment fields (disabled inputs) | Pass |
 | D-1…D-7 | Traveller, partner, admin, agent workflow, labelled simulated BHASHINI, responsive, sample data, full journey demo | | Pass |
 
-### Explorer-1 "Must" items not covered above
+#### Explorer-1 "Must" items not covered above
 
 | ID | Where | Status |
 |---|---|---|
@@ -111,7 +259,7 @@ Status: **Pass** = present and tested; **Partial** = present with a stated limit
 | CORE-01 | admin overview "Social-mandate guardrails" (ticket success, p95 latency), "Continue to IRCTC ticketing" link | Pass (simulated KPIs) |
 | BR-AG02, BR-ML01–08, BR-PR01 | see DR / ML / SG / PR rows | Pass |
 
-### Business case and course
+#### Business case and course
 
 | Check | Result |
 |---|---|
@@ -119,7 +267,7 @@ Status: **Pass** = present and tested; **Partial** = present with a stated limit
 | 5 case questions visibly addressed | **Pass.** Business case has Q1 Solution review, Q2 Data parameters, Q3 Marketing & advertising, Q4 Role of banks, Q5 Financial products for 3 segments |
 | Course frameworks | **Pass.** Platform/flywheel, VRIO, Sense–Seize–Transform (insights + admin), hype cycle, agentic autonomy levels / human-in-the-loop (Agent Trace + About) |
 
-## 4. Bugs found and fixed
+### v1 · 4. Bugs found and fixed
 
 | # | File | Fix |
 |---|---|---|
@@ -136,7 +284,7 @@ Status: **Pass** = present and tested; **Partial** = present with a stated limit
 
 Security: `grep` of the repository and git history for `AIza…`, `AQ.Ab8`, `key=…`, `sk-…` and hard-coded `api_key` literals found **no secrets**. The Gemini key lives only in the browser's localStorage (Settings), and `.gitignore` excludes `config.js`, `*.local.js` and `.env`. All user-supplied and AI text reaches the DOM through `OT.esc`, `OT.lang.highlight` (which escapes) or `textContent`. This was confirmed by an XSS probe in partner registration and listing titles. Confirm-dialog `lines` are HTML by contract, and every caller escapes its variables.
 
-## 5. Remaining known limitations
+### v1 · 5. Remaining known limitations
 
 1. **Voice depends on the device.** Speech recognition needs Chrome or Edge, and read-aloud needs an installed voice for the selected language (Hindi is often missing on Windows). Without them the app shows the text and a clear message, and the sample voice chips always work.
 2. **Language coverage.** English and Hindi are complete. The other 9 languages cover the header, search, timeline, statuses and assistant chrome, and the rest falls back to English, as the About page explains. Several assistant answers in those languages fall back to English, with a visible note.
@@ -145,16 +293,3 @@ Security: `grep` of the repository and git history for `AIza…`, `AQ.Ab8`, `key
 5. **On a 375 px phone, the tour card covers the lower part of the screen,** including the confirm dialog's buttons at step 12. The tour presses them for you, so this does not block the demo, but a laptop is the better demo device.
 6. Data checked-at times are relative to page load ("9 min ago"), because the data is simulated. The stale-data flag is deterministic by design.
 7. Gemini (optional) has been tested only offline (graceful failure). A live key was not available to the verifier.
-
-## Jury demo checklist
-
-1. Use **Chrome or Edge** on a laptop (window ≥ 1280 px wide). Open `index.html` by double-click, or run `start-server.bat` / `start-server.sh`.
-2. Before the jury arrives, open **Settings → Reset demo data**, then pick the starting language (English).
-3. Set **AI mode to "Simulated only"** unless the venue Wi-Fi and the Gemini key have been tested that morning (Settings → *Test key*).
-4. Windows: install the Hindi voice under **Settings → Time & Language → Speech → Add voices → Hindi**, then reopen the browser. macOS: System Settings → Accessibility → Spoken Content → System voice → Manage Voices → Hindi.
-5. Check **Settings → Voice capability check**: Hindi should show "voice(s)", and speech recognition should show "supported". Press *Play a Hindi sample* and confirm the audio comes out of the room's speakers.
-6. **Allow the microphone** on the first prompt. From file://, Chrome may ask again on every load; a local server (Live Server / start-server) remembers the choice.
-7. Have a fallback ready: the **हिन्दी sample voice chip** does the full Hindi query without a mic.
-8. For the scripted run, press **Start demo** (header) and then only *Next*. *Back* works, and **×** or Esc exits at any point.
-9. For the "wow" moment, after paying, open **Partner** (Hotel Shivalik View, P-101) to show the new booking highlighted, then **Admin & Bank → Language & support**.
-10. Close other tabs and turn off notifications and screen savers. Zoom the browser to 100% (Ctrl+0). Keep the README and this checklist open on a second screen.

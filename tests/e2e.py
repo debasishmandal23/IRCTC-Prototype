@@ -705,7 +705,10 @@ def v11_verify(browser, base, vp):
     tomorrow = pg.ev('() => OT.trains.tomorrow()')
     # header: globe icon + Sign in text + nav visible on desktop
     g = pg.ev('() => { const r = document.querySelector("#lang-globe svg").getBoundingClientRect(); return [r.width, r.height]; }')
-    check('header globe icon renders at full size (>=14px)', g[0] >= 14 and g[1] >= 14, g)
+    if vp == 'desktop':
+        check('header globe icon renders at full size (>=14px)', g[0] >= 14 and g[1] >= 14, g)
+    else:
+        check('phone: globe hidden to make room, language name readable', g[0] == 0 and pg.ev('() => { const s = document.querySelector("#lang-select"); return s.scrollWidth <= s.clientWidth; }'), g)
     check('header shows "Sign in" text', 'Sign in' in p.inner_text('#hdr-user'))
     if vp == 'desktop':
         check('desktop 1440: main nav visible (not collapsed)', p.locator('#main-nav a[data-nav="trains"]').is_visible())
@@ -863,7 +866,8 @@ def v11_verify(browser, base, vp):
     check('consent Off persists after reload', p.locator('.fy-trend').count() == 0)
     p.click('.switch .sw'); p.wait_for_timeout(250)
     # Book this package: whole chain
-    card = p.locator('.fy-trend').first
+    # Chandigarh package -> Hotel Shivalik View is partner P-101, so the partner/admin checks below always run
+    card = p.locator('.fy-trend[data-trend="CDG"]') if p.locator('.fy-trend[data-trend="CDG"]').count() else p.locator('.fy-trend').first
     dest = card.get_attribute('data-trend')
     exp = pg.ev('''d => { const p = OT.data.personas.get('sunita'), lw = OT.data.demand.longWeekends(null, 3)[OT.state.fyLw || 0];
        const tr = OT.data.demand.trends('NDLS', lw, p).find(x => x.to === d); const k = OT.data.demand.pkg(p, tr, lw);
@@ -910,6 +914,7 @@ def v11_verify(browser, base, vp):
     pg.scan('journey after package ' + vp, 'v11-journey-pkg-' + vp)
     # partner sees the hotel (not the train) as New via OneTrip
     hotel_b = pg.ev('() => OT.store.get("bookings").filter(b => b.partnerId === "P-101")')
+    check('package booked a partner P-101 hotel (enables the partner checks)', len(hotel_b) >= 1, dest)
     if hotel_b:
         p.click('#hdr-user'); p.click('#user-menu [data-persona="partner"]'); p.wait_for_timeout(500)
         pg.go('partner/bookings', 400)

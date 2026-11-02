@@ -724,3 +724,4 @@ bdi.keep { unicode-bidi: isolate; white-space: nowrap; font-variant-numeric: tab
 .app-header.tight .header-tools { gap: 6px; }
 .app-header.tight #hdr-user.signed-in .hu-name { display: none; }
 @media (max-width: 480px) { #hdr-user:not(.signed-in) .hu-name { display: inline-block; max-width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; } .app-header .header-tools { min-width: 0; } .lang-select select { max-width: 70px; } }
+@media (max-width: 400px) { .lang-select #lang-globe { display: none; } .lang-select select { max-width: 86px; } }
